@@ -65,8 +65,8 @@ function renderResults(data) {
   routeMapData = [];
 
   data.routes.forEach((route, i) => {
-    const routeId = route.route_id;
-    const mapDivId = `map-${routeId}`;
+    // Use the array index instead of route.route_id to ensure unique IDs
+    const mapDivId = `map-${i}`;
 
     if (route.stops.length < 2) return; // skip single-point routes
 
@@ -85,7 +85,7 @@ function renderResults(data) {
       </li>`).join("");
 
     const card = `
-      <div class="card mb-3 shadow-sm" data-route-id="${routeId}">
+      <div class="card mb-3 shadow-sm" data-route-id="${mapDivId}">
         <div class="card-header appertivo-purple d-flex justify-content-between">
           <span>Route ${i + 1}</span>
           <small>${route.total_time.toFixed(1)} minutes</small>
@@ -93,7 +93,7 @@ function renderResults(data) {
         <div class="card-body">
           <div id="${mapDivId}" class="gmap mb-3" style="width:100%;height:300px;background-color:#f5f5f5;"></div>
           <ul class="list-group list-group-flush">${stopsList}</ul>
-          <button class="btn btn-sm btn-outline-success mt-3" onclick="copyParcelList('${routeId}')">
+          <button class="btn btn-sm btn-outline-success mt-3" onclick="copyParcelList('${mapDivId}')">
             📋 Copy Parcel List
           </button>
         </div>
