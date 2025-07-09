@@ -115,22 +115,27 @@ window.initMaps = function () {
       tilt: 0
     });
 
-    // Add route polyline
+    // Decode and draw polyline between actual stops (not office)
     if (polyline && google.maps.geometry) {
-      const path = google.maps.geometry.encoding.decodePath(polyline);
-      const routeLine = new google.maps.Polyline({
-        path,
-        geodesic: true,
-        strokeColor: "#58B09C",
-        strokeOpacity: 0.9,
-        strokeWeight: 4,
-        map
-      });
+      const fullPath = google.maps.geometry.encoding.decodePath(polyline);
 
-      path.forEach(p => bounds.extend(p));
+      // Strip first and last points (office at both ends)
+      const stopPath = fullPath.slice(1, -1); // actual stops only
+      if (stopPath.length > 1) {
+        new google.maps.Polyline({
+          path: stopPath,
+          geodesic: true,
+          strokeColor: "#58B09C",
+          strokeOpacity: 0.9,
+          strokeWeight: 4,
+          map
+        });
+
+        stopPath.forEach(p => bounds.extend(p));
+      }
     }
 
-    // Add markers
+    // Add markers for actual stops
     stops.forEach((s, idx) => {
       const marker = new google.maps.Marker({
         position: { lat: s.latitude, lng: s.longitude },
@@ -153,14 +158,3 @@ window.initMaps = function () {
   });
 };
 
-function copyParcelList(routeId) {
-  const card = document.querySelector(`[data-route-id="${routeId}"]`);
-  const parcels = Array.from(card.querySelectorAll("li")).map(li => {
-    const match = li.textContent.match(/P\d+/);
-    return match ? match[0] : "";
-  }).filter(Boolean).join("\n");
-
-  navigator.clipboard.writeText(parcels)
-    .then(() => alert("Parcel list copied to clipboard!"))
-    .catch(() => alert("Clipboard copy failed."));
-}
