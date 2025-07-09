@@ -34,6 +34,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const data = await res.json();
       renderResults(data);
+      initMaps(); // <-- call after cards are drawn!
 
     } catch (err) {
       console.error("Fetch error:", err);
@@ -46,32 +47,33 @@ function renderResults(data) {
   const resultsDiv = document.getElementById("results");
   resultsDiv.innerHTML = "";
 
-  // ⬆️ Summary card
+  // Summary
   const totalTime = data.routes.reduce((sum, r) => sum + r.total_time, 0);
   const avgParcels = (
     data.routes.reduce((sum, r) => sum + r.stops.length, 0) / data.routes.length
   ).toFixed(1);
 
-  const summaryCard = `
+  const summary = `
     <div class="card mb-4 shadow-sm">
       <div class="card-body">
-        <h5 class="card-title">Route Summary</h5>
+        <h5 class="card-title">📦 Route Summary</h5>
         <ul class="list-group list-group-flush">
           <li class="list-group-item"><strong>Total Routes:</strong> ${data.stats.total_routes}</li>
           <li class="list-group-item"><strong>Total Time:</strong> ${totalTime.toFixed(1)} minutes</li>
-          <li class="list-group-item"><strong>Avg Parcels per Route:</strong> ${avgParcels}</li>
+          <li class="list-group-item"><strong>Average Parcels per Route:</strong> ${avgParcels}</li>
         </ul>
       </div>
     </div>`;
-  resultsDiv.insertAdjacentHTML("beforeend", summaryCard);
+  resultsDiv.insertAdjacentHTML("beforeend", summary);
 
+  // Reset data for maps
   routeMapData = [];
 
   data.routes.forEach((route, i) => {
     const routeId = route.route_id;
     const mapDivId = `map-${routeId}`;
 
-    // store route info for map rendering
+    // Store for map init
     routeMapData.push({
       routeId: mapDivId,
       stops: route.stops.map((s, idx) => ({
@@ -89,7 +91,7 @@ function renderResults(data) {
       </li>`
     ).join("");
 
-    const cardHtml = `
+    const card = `
       <div class="card mb-3 shadow-sm" data-route-id="${routeId}">
         <div class="card-header appertivo-purple text-white d-flex justify-content-between">
           <span>Route ${i + 1}</span>
@@ -103,10 +105,8 @@ function renderResults(data) {
           </button>
         </div>
       </div>`;
-    resultsDiv.insertAdjacentHTML("beforeend", cardHtml);
+    resultsDiv.insertAdjacentHTML("beforeend", card);
   });
-
-  setTimeout(initMaps, 300);
 }
 
 function initMaps() {
@@ -184,6 +184,5 @@ function copyParcelList(routeId) {
 
   navigator.clipboard.writeText(parcels)
     .then(() => alert("Parcel list copied to clipboard!"))
-    .catch(err => alert("Clipboard error."));
+    .catch(() => alert("Clipboard copy failed."));
 }
-window.initMaps = initMaps;
