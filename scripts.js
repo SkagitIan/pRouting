@@ -1,3 +1,5 @@
+window.initMaps = () => console.log("✅ Google Maps SDK is loaded");
+
 let routeMapData = [];
 
 document.addEventListener("DOMContentLoaded", () => {
