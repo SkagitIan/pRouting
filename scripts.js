@@ -78,7 +78,7 @@ function renderResults(data) {
 
     const stopsList = route.stops.map((stop, idx) =>
       `<li class="list-group-item">
-        <strong>Stop ${idx + 1} – ${stop.prop_id}</strong>
+        <span class="badge">${idx + 1}</span><span><strong>${stop.prop_id}</strong></span>
         <a href="https://maps.google.com/?q=${stop.latitude},${stop.longitude}" target="_blank">
           <small class="text-muted ms-2">${stop.address || "No address"}</small>
         </a>
