@@ -31,7 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       const data = await res.json();
       renderResults(data);
-      initMaps(); // only now build maps
+      initMaps();
 
     } catch (err) {
       console.error("Fetch error:", err);
@@ -68,6 +68,8 @@ function renderResults(data) {
     const routeId = route.route_id;
     const mapDivId = `map-${routeId}`;
 
+    if (route.stops.length < 2) return; // skip single-point routes
+
     routeMapData.push({
       routeId: mapDivId,
       stops: route.stops.map((s, idx) => ({ ...s, label: `${idx + 1}` })),
@@ -100,8 +102,7 @@ function renderResults(data) {
   });
 }
 
-// Called once Google Maps SDK and DOM are ready
-window.initMaps = function() {
+window.initMaps = function () {
   console.log("✅ Initializing maps for", routeMapData.length, "routes");
 
   routeMapData.forEach(({ routeId, stops, polyline }) => {
@@ -114,17 +115,19 @@ window.initMaps = function() {
       tilt: 0
     });
 
-    // Draw polyline if available
+    // Add route polyline
     if (polyline && google.maps.geometry) {
-      const decodedPath = google.maps.geometry.encoding.decodePath(polyline);
-      new google.maps.Polyline({
-        path: decodedPath,
+      const path = google.maps.geometry.encoding.decodePath(polyline);
+      const routeLine = new google.maps.Polyline({
+        path,
         geodesic: true,
-        strokeColor: "#B993D6",
-        strokeOpacity: 1.0,
+        strokeColor: "#58B09C",
+        strokeOpacity: 0.9,
         strokeWeight: 4,
         map
       });
+
+      path.forEach(p => bounds.extend(p));
     }
 
     // Add markers
