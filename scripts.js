@@ -37,8 +37,9 @@ document.addEventListener("DOMContentLoaded", () => {
         throw new Error(`Server responded with status ${res.status}`);
       }
 
-      const data = await res.json();
-      console.log("Response from API:", data);
+       const raw = await res.text();
+       console.log("RAW RESPONSE:", raw);
+       const data = JSON.parse(raw);
       renderResults(data);
 
     } catch (err) {
