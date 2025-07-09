@@ -100,7 +100,7 @@ function renderResults(data) {
           <small>${route.total_time.toFixed(1)} minutes</small>
         </div>
         <div class="card-body">
-          <div id="${mapDivId}" class="gmap mb-3"></div>
+          <div id="${mapDivId}" class="gmap mb-3" style="width:100%;height:300px;background-color:#f5f5f5;"></div>
           <ul class="list-group list-group-flush">${stopsList}</ul>
           <button class="btn btn-sm btn-outline-success mt-3" onclick="copyParcelList('${routeId}')">
             📋 Copy Parcel List
