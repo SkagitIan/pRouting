@@ -1,5 +1,3 @@
-window.initMaps = () => console.log("✅ Google Maps SDK is loaded");
-
 let routeMapData = [];
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -111,73 +109,77 @@ function renderResults(data) {
   });
 }
 
-function initMaps() {
-  routeMapData.forEach(({ routeId, stops }) => {
-    const mapEl = document.getElementById(routeId);
-    if (!mapEl || stops.length < 2) return;
+// This function will now be called by the Google Maps SDK when it's loaded
+// AND by your optimizeBtn click handler after results are rendered.
+window.initMaps = function() {
+    console.log("✅ Google Maps SDK is loaded (and maps are being built if data exists)");
 
-    const bounds = new google.maps.LatLngBounds();
-    const map = new google.maps.Map(mapEl, {
-      mapTypeId: "roadmap",
-      tilt: 0
-    });
+    // The rest of your map rendering logic
+    routeMapData.forEach(({ routeId, stops }) => {
+        const mapEl = document.getElementById(routeId);
+        if (!mapEl || stops.length < 2) return; // Ensure map element exists and enough stops
 
-    const directionsService = new google.maps.DirectionsService();
-    const directionsRenderer = new google.maps.DirectionsRenderer({
-      map,
-      suppressMarkers: true,
-      preserveViewport: true,
-      polylineOptions: {
-        strokeColor: "#B993D6", // Appertivo Purple
-        strokeWeight: 4
-      }
-    });
-
-    const waypoints = stops.slice(1, -1).map(s => ({
-      location: new google.maps.LatLng(s.latitude, s.longitude),
-      stopover: true
-    }));
-
-    const origin = stops[0];
-    const destination = stops[stops.length - 1];
-
-    directionsService.route({
-      origin: { lat: origin.latitude, lng: origin.longitude },
-      destination: { lat: destination.latitude, lng: destination.longitude },
-      waypoints,
-      optimizeWaypoints: false,
-      travelMode: google.maps.TravelMode.DRIVING
-    }, (result, status) => {
-      if (status === "OK") {
-        directionsRenderer.setDirections(result);
-
-        stops.forEach((s, idx) => {
-          const marker = new google.maps.Marker({
-            position: { lat: s.latitude, lng: s.longitude },
-            map,
-            label: `${idx + 1}`,
-            title: s.prop_id,
-            icon: {
-              path: google.maps.SymbolPath.CIRCLE,
-              fillColor: "#f08000", // Appertivo Orange
-              fillOpacity: 1,
-              strokeColor: "#49475B",
-              strokeWeight: 1,
-              scale: 6
-            }
-          });
-          bounds.extend(marker.getPosition());
+        const bounds = new google.maps.LatLngBounds();
+        const map = new google.maps.Map(mapEl, {
+            mapTypeId: "roadmap",
+            tilt: 0
         });
 
-        map.fitBounds(bounds);
-      } else {
-        console.error("Directions request failed:", status);
-      }
-    });
-  });
-  console.log("Building maps for", routeMapData.length, "routes");
+        const directionsService = new google.maps.DirectionsService();
+        const directionsRenderer = new google.maps.DirectionsRenderer({
+            map,
+            suppressMarkers: true,
+            preserveViewport: true,
+            polylineOptions: {
+                strokeColor: "#B993D6", // Appertivo Purple
+                strokeWeight: 4
+            }
+        });
 
-}
+        const waypoints = stops.slice(1, -1).map(s => ({
+            location: new google.maps.LatLng(s.latitude, s.longitude),
+            stopover: true
+        }));
+
+        const origin = stops[0];
+        const destination = stops[stops.length - 1];
+
+        directionsService.route({
+            origin: { lat: origin.latitude, lng: origin.longitude },
+            destination: { lat: destination.latitude, lng: destination.longitude },
+            waypoints,
+            optimizeWaypoints: false,
+            travelMode: google.maps.TravelMode.DRIVING
+        }, (result, status) => {
+            if (status === "OK") {
+                directionsRenderer.setDirections(result);
+
+                stops.forEach((s, idx) => {
+                    const marker = new google.maps.Marker({
+                        position: { lat: s.latitude, lng: s.longitude },
+                        map,
+                        label: `${idx + 1}`,
+                        title: s.prop_id,
+                        icon: {
+                            path: google.maps.SymbolPath.CIRCLE,
+                            fillColor: "#f08000", // Appertivo Orange
+                            fillOpacity: 1,
+                            strokeColor: "#49475B",
+                            strokeWeight: 1,
+                            scale: 6
+                        }
+                    });
+                    bounds.extend(marker.getPosition());
+                });
+
+                map.fitBounds(bounds);
+            } else {
+                console.error("Directions request failed:", status);
+            }
+        });
+    });
+    console.log("Building maps for", routeMapData.length, "routes");
+}; // End of window.initMaps function
 
 function copyParcelList(routeId) {
   const card = document.querySelector(`[data-route-id="${routeId}"]`);
