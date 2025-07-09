@@ -18,11 +18,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     resultsDiv.innerHTML = `<div class="alert alert-info">Processing ${parcels.length} parcels... please wait.</div>`;
 
-   const payload = {
-  parcels,
-  mode: fieldMode,
-  group_size: 30  // Add this line
-};;
+    const payload = {
+      parcels,
+      mode: fieldMode,
+      group_size: 30
+    }; // Fixed: removed extra semicolon
 
     try {
       const res = await fetch("https://prouting-391338802487.us-west1.run.app", {
@@ -38,9 +38,9 @@ document.addEventListener("DOMContentLoaded", () => {
         throw new Error(`Server responded with status ${res.status}`);
       }
 
-       const raw = await res.text();
-       console.log("RAW RESPONSE:", raw);
-       const data = JSON.parse(raw);
+      const raw = await res.text();
+      console.log("RAW RESPONSE:", raw);
+      const data = JSON.parse(raw);
       renderResults(data);
 
     } catch (err) {
@@ -211,7 +211,3 @@ const additionalCSS = `
 
 // Add the CSS to the head
 document.head.insertAdjacentHTML('beforeend', additionalCSS);
-
-    resultsDiv.appendChild(group);
-  });
-}
