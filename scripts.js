@@ -1,3 +1,5 @@
+let routeMapData = [];
+
 document.addEventListener("DOMContentLoaded", () => {
   const optimizeBtn = document.getElementById("optimizeBtn");
   const resultsDiv = document.getElementById("results");
@@ -22,15 +24,17 @@ document.addEventListener("DOMContentLoaded", () => {
       const res = await fetch("https://prouting-391338802487.us-west1.run.app", {
         method: "POST",
         mode: "cors",
-        headers: {"Content-Type": "application/json"},
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({ parcels, mode: fieldMode, group_size: 30 })
       });
 
-      if (!res.ok) throw new Error(`Server responded with status ${res.status}`);
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
 
       const data = await res.json();
-
       renderResults(data);
+
     } catch (err) {
       console.error("Fetch error:", err);
       resultsDiv.innerHTML = `<div class="alert alert-danger">Something went wrong. Please try again.</div>`;
@@ -42,63 +46,133 @@ function renderResults(data) {
   const resultsDiv = document.getElementById("results");
   resultsDiv.innerHTML = "";
 
-  // 2️⃣ Summary Card
+  // ⬆️ Summary card
   const totalTime = data.routes.reduce((sum, r) => sum + r.total_time, 0);
-  const avgParcels = (data.routes.reduce((sum, r) => sum + r.stops.length, 0) / data.routes.length).toFixed(1);
-  const summaryHtml = `
+  const avgParcels = (
+    data.routes.reduce((sum, r) => sum + r.stops.length, 0) / data.routes.length
+  ).toFixed(1);
+
+  const summaryCard = `
     <div class="card mb-4 shadow-sm">
       <div class="card-body">
         <h5 class="card-title">Route Summary</h5>
         <ul class="list-group list-group-flush">
           <li class="list-group-item"><strong>Total Routes:</strong> ${data.stats.total_routes}</li>
-          <li class="list-group-item"><strong>Total Time:</strong> ${totalTime.toFixed(1)} minutes</li>
+          <li class="list-group-item"><strong>Total Time:</strong> ${totalTime.toFixed(1)} minutes</li>
           <li class="list-group-item"><strong>Avg Parcels per Route:</strong> ${avgParcels}</li>
         </ul>
       </div>
     </div>`;
-  resultsDiv.insertAdjacentHTML("beforeend", summaryHtml);
+  resultsDiv.insertAdjacentHTML("beforeend", summaryCard);
+
+  routeMapData = [];
 
   data.routes.forEach((route, i) => {
-    const mapSection = createMapSection(route, i);
+    const routeId = route.route_id;
+    const mapDivId = `map-${routeId}`;
+
+    // store route info for map rendering
+    routeMapData.push({
+      routeId: mapDivId,
+      stops: route.stops.map((s, idx) => ({
+        ...s,
+        label: `${idx + 1}`
+      }))
+    });
+
     const stopsList = route.stops.map((stop, idx) =>
       `<li class="list-group-item">
-        <strong>Stop ${idx+1} – ${stop.prop_id}</strong><br/>
+        <strong>Stop ${idx + 1} – ${stop.prop_id}</strong><br/>
         <a href="https://maps.google.com/?q=${stop.latitude},${stop.longitude}" target="_blank">
-          <small class="text-muted">${stop.address || 'No address'}</small>
+          <small class="text-muted">${stop.address || "No address"}</small>
         </a>
-      </li>`).join("");
+      </li>`
+    ).join("");
 
-    const routeHtml = `
-      <div class="card mb-3 shadow-sm" data-route-id="${route.route_id}">
+    const cardHtml = `
+      <div class="card mb-3 shadow-sm" data-route-id="${routeId}">
         <div class="card-header appertivo-purple text-white d-flex justify-content-between">
-          <span>Route ${i+1}</span>
-          <small>${route.total_time.toFixed(1)} minutes</small>
+          <span>Route ${i + 1}</span>
+          <small>${route.total_time.toFixed(1)} minutes</small>
         </div>
         <div class="card-body">
-          ${mapSection}
-          <ul class="list-group list-group-flush mt-3">${stopsList}</ul>
-          <button class="btn btn-sm btn-outline-success mt-3" onclick="copyParcelList('${route.route_id}')">
+          <div id="${mapDivId}" class="gmap mb-3"></div>
+          <ul class="list-group list-group-flush">${stopsList}</ul>
+          <button class="btn btn-sm btn-outline-success mt-3" onclick="copyParcelList('${routeId}')">
             📋 Copy Parcel List
           </button>
         </div>
       </div>`;
-    resultsDiv.insertAdjacentHTML("beforeend", routeHtml);
+    resultsDiv.insertAdjacentHTML("beforeend", cardHtml);
   });
+
+  setTimeout(initMaps, 300);
 }
 
-function createMapSection(route, idx) {
-  const coords = route.stops.map(s => `${s.latitude},${s.longitude}`);
-  const centerLat = (route.stops.reduce((sum, s) => sum + s.latitude, 0) / coords.length).toFixed(6);
-  const centerLng = (route.stops.reduce((sum, s) => sum + s.longitude, 0) / coords.length).toFixed(6);
-  const zoom = 13;
+function initMaps() {
+  routeMapData.forEach(({ routeId, stops }) => {
+    const mapEl = document.getElementById(routeId);
+    if (!mapEl || stops.length < 2) return;
 
-  const markerParams = coords.map(c => `markers=label:P|${c}`).join("&");
-  const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${centerLat},${centerLng}&zoom=${zoom}&size=600x300&style=feature:road|element:geometry|lightness:50&${markerParams}&key=YOUR_STATIC_MAP_KEY`;
+    const bounds = new google.maps.LatLngBounds();
+    const map = new google.maps.Map(mapEl, {
+      mapTypeId: "roadmap",
+      tilt: 0
+    });
 
-  return `
-    <div class="map-container mb-3">
-      <img src="${mapUrl}" class="img-fluid rounded shadow-sm" alt="Route map ${idx+1}"/>
-    </div>`;
+    const directionsService = new google.maps.DirectionsService();
+    const directionsRenderer = new google.maps.DirectionsRenderer({
+      map,
+      suppressMarkers: true,
+      preserveViewport: true,
+      polylineOptions: {
+        strokeColor: "#B993D6", // Appertivo Purple
+        strokeWeight: 4
+      }
+    });
+
+    const waypoints = stops.slice(1, -1).map(s => ({
+      location: new google.maps.LatLng(s.latitude, s.longitude),
+      stopover: true
+    }));
+
+    const origin = stops[0];
+    const destination = stops[stops.length - 1];
+
+    directionsService.route({
+      origin: { lat: origin.latitude, lng: origin.longitude },
+      destination: { lat: destination.latitude, lng: destination.longitude },
+      waypoints,
+      optimizeWaypoints: false,
+      travelMode: google.maps.TravelMode.DRIVING
+    }, (result, status) => {
+      if (status === "OK") {
+        directionsRenderer.setDirections(result);
+
+        stops.forEach((s, idx) => {
+          const marker = new google.maps.Marker({
+            position: { lat: s.latitude, lng: s.longitude },
+            map,
+            label: `${idx + 1}`,
+            title: s.prop_id,
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              fillColor: "#f08000", // Appertivo Orange
+              fillOpacity: 1,
+              strokeColor: "#49475B",
+              strokeWeight: 1,
+              scale: 6
+            }
+          });
+          bounds.extend(marker.getPosition());
+        });
+
+        map.fitBounds(bounds);
+      } else {
+        console.error("Directions request failed:", status);
+      }
+    });
+  });
 }
 
 function copyParcelList(routeId) {
@@ -110,5 +184,5 @@ function copyParcelList(routeId) {
 
   navigator.clipboard.writeText(parcels)
     .then(() => alert("Parcel list copied to clipboard!"))
-    .catch(err => alert("Failed to copy parcel list."));
+    .catch(err => alert("Clipboard error."));
 }
