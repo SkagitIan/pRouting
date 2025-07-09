@@ -105,56 +105,79 @@ function renderResults(data) {
 window.initMaps = function () {
   console.log("✅ Initializing maps for", routeMapData.length, "routes");
 
-  routeMapData.forEach(({ routeId, stops, polyline }) => {
+  routeMapData.forEach(({ routeId, stops, polyline }, index) => {
+    console.log(`🔍 Processing route ${index + 1}:`, routeId);
+    
     const mapEl = document.getElementById(routeId);
-    if (!mapEl || stops.length < 2) return;
-
-    const bounds = new google.maps.LatLngBounds();
-    const map = new google.maps.Map(mapEl, {
-      mapTypeId: "roadmap",
-      tilt: 0
-    });
-
-    // Decode and draw polyline between actual stops (not office)
-    if (polyline && google.maps.geometry) {
-      const fullPath = google.maps.geometry.encoding.decodePath(polyline);
-
-      // Strip first and last points (office at both ends)
-      const stopPath = fullPath.slice(1, -1); // actual stops only
-      if (stopPath.length > 1) {
-        new google.maps.Polyline({
-          path: stopPath,
-          geodesic: true,
-          strokeColor: "#58B09C",
-          strokeOpacity: 0.9,
-          strokeWeight: 4,
-          map
-        });
-
-        stopPath.forEach(p => bounds.extend(p));
-      }
+    if (!mapEl) {
+      console.error(`❌ Map element not found for: ${routeId}`);
+      return;
+    }
+    
+    if (stops.length < 2) {
+      console.log(`⚠️ Skipping ${routeId} - only ${stops.length} stops`);
+      return;
     }
 
-    // Add markers for actual stops
-    stops.forEach((s, idx) => {
-      const marker = new google.maps.Marker({
-        position: { lat: s.latitude, lng: s.longitude },
-        map,
-        label: `${idx + 1}`,
-        title: s.prop_id,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          fillColor: "#f08000",
-          fillOpacity: 1,
-          strokeColor: "#49475B",
-          strokeWeight: 1,
-          scale: 6
-        }
-      });
-      bounds.extend(marker.getPosition());
-    });
+    console.log(`📍 Creating map for ${routeId} with ${stops.length} stops`);
 
-    map.fitBounds(bounds);
+    try {
+      const bounds = new google.maps.LatLngBounds();
+      const map = new google.maps.Map(mapEl, {
+        mapTypeId: "roadmap",
+        tilt: 0
+      });
+
+      console.log(`✅ Map created successfully for ${routeId}`);
+
+      // Decode and draw polyline between actual stops (not office)
+      if (polyline && google.maps.geometry) {
+        console.log(`🛣️ Drawing polyline for ${routeId}`);
+        const fullPath = google.maps.geometry.encoding.decodePath(polyline);
+
+        // Strip first and last points (office at both ends)
+        const stopPath = fullPath.slice(1, -1); // actual stops only
+        if (stopPath.length > 1) {
+          new google.maps.Polyline({
+            path: stopPath,
+            geodesic: true,
+            strokeColor: "#58B09C",
+            strokeOpacity: 0.9,
+            strokeWeight: 4,
+            map
+          });
+
+          stopPath.forEach(p => bounds.extend(p));
+        }
+      } else {
+        console.log(`⚠️ No polyline or geometry library for ${routeId}`);
+      }
+
+      // Add markers for actual stops
+      console.log(`📌 Adding ${stops.length} markers for ${routeId}`);
+      stops.forEach((s, idx) => {
+        const marker = new google.maps.Marker({
+          position: { lat: s.latitude, lng: s.longitude },
+          map,
+          label: `${idx + 1}`,
+          title: s.prop_id,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            fillColor: "#f08000",
+            fillOpacity: 1,
+            strokeColor: "#49475B",
+            strokeWeight: 1,
+            scale: 6
+          }
+        });
+        bounds.extend(marker.getPosition());
+      });
+
+      map.fitBounds(bounds);
+      console.log(`✅ Map completed for ${routeId}`);
+
+    } catch (error) {
+      console.error(`❌ Error creating map for ${routeId}:`, error);
+    }
   });
 };
-
