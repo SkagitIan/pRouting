@@ -18,10 +18,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     resultsDiv.innerHTML = `<div class="alert alert-info">Processing ${parcels.length} parcels... please wait.</div>`;
 
-    const payload = {
-      parcels,
-      mode: fieldMode
-    };
+   const payload = {
+  parcels,
+  mode: fieldMode,
+  group_size: 30  // Add this line
+};;
 
     try {
       const res = await fetch("https://prouting-391338802487.us-west1.run.app", {
