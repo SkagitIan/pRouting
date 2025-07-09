@@ -24,17 +24,14 @@ document.addEventListener("DOMContentLoaded", () => {
       const res = await fetch("https://prouting-391338802487.us-west1.run.app", {
         method: "POST",
         mode: "cors",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ parcels, mode: fieldMode, group_size: 30 })
       });
 
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
-
       const data = await res.json();
       renderResults(data);
-      initMaps(); // <-- call after cards are drawn!
+      initMaps(); // only now build maps
 
     } catch (err) {
       console.error("Fetch error:", err);
@@ -47,7 +44,6 @@ function renderResults(data) {
   const resultsDiv = document.getElementById("results");
   resultsDiv.innerHTML = "";
 
-  // Summary
   const totalTime = data.routes.reduce((sum, r) => sum + r.total_time, 0);
   const avgParcels = (
     data.routes.reduce((sum, r) => sum + r.stops.length, 0) / data.routes.length
@@ -66,20 +62,16 @@ function renderResults(data) {
     </div>`;
   resultsDiv.insertAdjacentHTML("beforeend", summary);
 
-  // Reset data for maps
   routeMapData = [];
 
   data.routes.forEach((route, i) => {
     const routeId = route.route_id;
     const mapDivId = `map-${routeId}`;
 
-    // Store for map init
     routeMapData.push({
       routeId: mapDivId,
-      stops: route.stops.map((s, idx) => ({
-        ...s,
-        label: `${idx + 1}`
-      }))
+      stops: route.stops.map((s, idx) => ({ ...s, label: `${idx + 1}` })),
+      polyline: route.polyline
     });
 
     const stopsList = route.stops.map((stop, idx) =>
@@ -88,8 +80,7 @@ function renderResults(data) {
         <a href="https://maps.google.com/?q=${stop.latitude},${stop.longitude}" target="_blank">
           <small class="text-muted">${stop.address || "No address"}</small>
         </a>
-      </li>`
-    ).join("");
+      </li>`).join("");
 
     const card = `
       <div class="card mb-3 shadow-sm" data-route-id="${routeId}">
@@ -109,77 +100,55 @@ function renderResults(data) {
   });
 }
 
-// This function will now be called by the Google Maps SDK when it's loaded
-// AND by your optimizeBtn click handler after results are rendered.
+// Called once Google Maps SDK and DOM are ready
 window.initMaps = function() {
-    console.log("✅ Google Maps SDK is loaded (and maps are being built if data exists)");
+  console.log("✅ Initializing maps for", routeMapData.length, "routes");
 
-    // The rest of your map rendering logic
-    routeMapData.forEach(({ routeId, stops }) => {
-        const mapEl = document.getElementById(routeId);
-        if (!mapEl || stops.length < 2) return; // Ensure map element exists and enough stops
+  routeMapData.forEach(({ routeId, stops, polyline }) => {
+    const mapEl = document.getElementById(routeId);
+    if (!mapEl || stops.length < 2) return;
 
-        const bounds = new google.maps.LatLngBounds();
-        const map = new google.maps.Map(mapEl, {
-            mapTypeId: "roadmap",
-            tilt: 0
-        });
-
-        const directionsService = new google.maps.DirectionsService();
-        const directionsRenderer = new google.maps.DirectionsRenderer({
-            map,
-            suppressMarkers: true,
-            preserveViewport: true,
-            polylineOptions: {
-                strokeColor: "#B993D6", // Appertivo Purple
-                strokeWeight: 4
-            }
-        });
-
-        const waypoints = stops.slice(1, -1).map(s => ({
-            location: new google.maps.LatLng(s.latitude, s.longitude),
-            stopover: true
-        }));
-
-        const origin = stops[0];
-        const destination = stops[stops.length - 1];
-
-        directionsService.route({
-            origin: { lat: origin.latitude, lng: origin.longitude },
-            destination: { lat: destination.latitude, lng: destination.longitude },
-            waypoints,
-            optimizeWaypoints: false,
-            travelMode: google.maps.TravelMode.DRIVING
-        }, (result, status) => {
-            if (status === "OK") {
-                directionsRenderer.setDirections(result);
-
-                stops.forEach((s, idx) => {
-                    const marker = new google.maps.Marker({
-                        position: { lat: s.latitude, lng: s.longitude },
-                        map,
-                        label: `${idx + 1}`,
-                        title: s.prop_id,
-                        icon: {
-                            path: google.maps.SymbolPath.CIRCLE,
-                            fillColor: "#f08000", // Appertivo Orange
-                            fillOpacity: 1,
-                            strokeColor: "#49475B",
-                            strokeWeight: 1,
-                            scale: 6
-                        }
-                    });
-                    bounds.extend(marker.getPosition());
-                });
-
-                map.fitBounds(bounds);
-            } else {
-                console.error("Directions request failed:", status);
-            }
-        });
+    const bounds = new google.maps.LatLngBounds();
+    const map = new google.maps.Map(mapEl, {
+      mapTypeId: "roadmap",
+      tilt: 0
     });
-    console.log("Building maps for", routeMapData.length, "routes");
-}; // End of window.initMaps function
+
+    // Draw polyline if available
+    if (polyline && google.maps.geometry) {
+      const decodedPath = google.maps.geometry.encoding.decodePath(polyline);
+      new google.maps.Polyline({
+        path: decodedPath,
+        geodesic: true,
+        strokeColor: "#B993D6",
+        strokeOpacity: 1.0,
+        strokeWeight: 4,
+        map
+      });
+    }
+
+    // Add markers
+    stops.forEach((s, idx) => {
+      const marker = new google.maps.Marker({
+        position: { lat: s.latitude, lng: s.longitude },
+        map,
+        label: `${idx + 1}`,
+        title: s.prop_id,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          fillColor: "#f08000",
+          fillOpacity: 1,
+          strokeColor: "#49475B",
+          strokeWeight: 1,
+          scale: 6
+        }
+      });
+      bounds.extend(marker.getPosition());
+    });
+
+    map.fitBounds(bounds);
+  });
+};
 
 function copyParcelList(routeId) {
   const card = document.querySelector(`[data-route-id="${routeId}"]`);
