@@ -186,3 +186,4 @@ function copyParcelList(routeId) {
     .then(() => alert("Parcel list copied to clipboard!"))
     .catch(err => alert("Clipboard error."));
 }
+window.initMaps = initMaps;
