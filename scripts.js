@@ -95,7 +95,7 @@ function renderResults(data) {
 
     const card = `
       <div class="card mb-3 shadow-sm" data-route-id="${routeId}">
-        <div class="card-header appertivo-purple text-white d-flex justify-content-between">
+        <div class="card-header appertivo-purple d-flex justify-content-between">
           <span>Route ${i + 1}</span>
           <small>${route.total_time.toFixed(1)} minutes</small>
         </div>
@@ -175,6 +175,8 @@ function initMaps() {
       }
     });
   });
+  console.log("Building maps for", routeMapData.length, "routes");
+
 }
 
 function copyParcelList(routeId) {
