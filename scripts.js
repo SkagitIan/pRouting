@@ -186,3 +186,4 @@ function copyParcelList(routeId) {
     .then(() => alert("Parcel list copied to clipboard!"))
     .catch(() => alert("Clipboard copy failed."));
 }
+window.initMaps = () => console.log("✅ Google Maps SDK is loaded");
