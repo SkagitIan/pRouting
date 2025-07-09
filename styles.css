@@ -1,0 +1,26 @@
+/* Appertivo color palette */
+:root {
+  --purple: #B993D6;
+  --orange: #f08000;
+  --teal: #58B09C;
+  --slate: #49475B;
+  --black: #14080E;
+}
+
+body {
+  font-family: 'Segoe UI', sans-serif;
+}
+
+.appertivo-purple {
+  color: var(--purple);
+}
+
+.appertivo-orange {
+  background-color: var(--orange);
+  border-color: var(--orange);
+}
+
+.appertivo-orange:hover {
+  background-color: #d76f00;
+  border-color: #d76f00;
+}
