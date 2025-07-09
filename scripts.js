@@ -18,31 +18,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
     resultsDiv.innerHTML = `<div class="alert alert-info">Processing ${parcels.length} parcels... please wait.</div>`;
 
-    const payload = {
-      parcels,
-      mode: fieldMode,
-      group_size: 30
-    }; // Fixed: removed extra semicolon
-
     try {
       const res = await fetch("https://prouting-391338802487.us-west1.run.app", {
         method: "POST",
         mode: "cors",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload)
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ parcels, mode: fieldMode, group_size: 30 })
       });
 
-      if (!res.ok) {
-        throw new Error(`Server responded with status ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`Server responded with status ${res.status}`);
 
-      const raw = await res.text();
-      console.log("RAW RESPONSE:", raw);
-      const data = JSON.parse(raw);
+      const data = await res.json();
+
       renderResults(data);
-
     } catch (err) {
       console.error("Fetch error:", err);
       resultsDiv.innerHTML = `<div class="alert alert-danger">Something went wrong. Please try again.</div>`;
@@ -53,161 +41,74 @@ document.addEventListener("DOMContentLoaded", () => {
 function renderResults(data) {
   const resultsDiv = document.getElementById("results");
   resultsDiv.innerHTML = "";
-  
-  if (!data.routes || data.routes.length === 0) {
-    resultsDiv.innerHTML = `<div class="alert alert-warning">No routes found.</div>`;
-    return;
-  }
-  
-  data.routes.forEach((route, i) => {
-    const group = document.createElement("div");
-    group.classList.add("card", "mb-3", "shadow-sm");
-    
-    const stops = route.stops.map((stop, idx) =>
-      `<li class="list-group-item">
-        <strong>Stop ${idx + 1}:</strong> ${stop.address || 'No address'} 
-        <span class="text-muted">(${stop.prop_id})</span>
-      </li>`
-    ).join("");
-    
-    // Create map section with error handling
-    const mapSection = createMapSection(route.map_url, route.route_id, route.stops);
-    
-    group.innerHTML = `
-      <div class="card-header appertivo-purple text-white">
-        <div class="d-flex justify-content-between align-items-center">
-          <span>Route ${i + 1}</span>
-          <small>${route.total_time} minutes</small>
-        </div>
-      </div>
-      <ul class="list-group list-group-flush">${stops}</ul>
+
+  // 2️⃣ Summary Card
+  const totalTime = data.routes.reduce((sum, r) => sum + r.total_time, 0);
+  const avgParcels = (data.routes.reduce((sum, r) => sum + r.stops.length, 0) / data.routes.length).toFixed(1);
+  const summaryHtml = `
+    <div class="card mb-4 shadow-sm">
       <div class="card-body">
-        ${mapSection}
+        <h5 class="card-title">Route Summary</h5>
+        <ul class="list-group list-group-flush">
+          <li class="list-group-item"><strong>Total Routes:</strong> ${data.stats.total_routes}</li>
+          <li class="list-group-item"><strong>Total Time:</strong> ${totalTime.toFixed(1)} minutes</li>
+          <li class="list-group-item"><strong>Avg Parcels per Route:</strong> ${avgParcels}</li>
+        </ul>
       </div>
-    `;
-    
-    resultsDiv.appendChild(group);
+    </div>`;
+  resultsDiv.insertAdjacentHTML("beforeend", summaryHtml);
+
+  data.routes.forEach((route, i) => {
+    const mapSection = createMapSection(route, i);
+    const stopsList = route.stops.map((stop, idx) =>
+      `<li class="list-group-item">
+        <strong>Stop ${idx+1} – ${stop.prop_id}</strong><br/>
+        <a href="https://maps.google.com/?q=${stop.latitude},${stop.longitude}" target="_blank">
+          <small class="text-muted">${stop.address || 'No address'}</small>
+        </a>
+      </li>`).join("");
+
+    const routeHtml = `
+      <div class="card mb-3 shadow-sm" data-route-id="${route.route_id}">
+        <div class="card-header appertivo-purple text-white d-flex justify-content-between">
+          <span>Route ${i+1}</span>
+          <small>${route.total_time.toFixed(1)} minutes</small>
+        </div>
+        <div class="card-body">
+          ${mapSection}
+          <ul class="list-group list-group-flush mt-3">${stopsList}</ul>
+          <button class="btn btn-sm btn-outline-success mt-3" onclick="copyParcelList('${route.route_id}')">
+            📋 Copy Parcel List
+          </button>
+        </div>
+      </div>`;
+    resultsDiv.insertAdjacentHTML("beforeend", routeHtml);
   });
 }
 
-function createMapSection(mapUrl, routeId, stops) {
-  if (!mapUrl) {
-    return `
-      <div class="alert alert-info">
-        <i class="fas fa-info-circle"></i>
-        Map not available for this route.
-      </div>
-    `;
-  }
-  
-  // Create a unique ID for this map
-  const mapId = `map-${routeId}`;
-  
+function createMapSection(route, idx) {
+  const coords = route.stops.map(s => `${s.latitude},${s.longitude}`);
+  const centerLat = (route.stops.reduce((sum, s) => sum + s.latitude, 0) / coords.length).toFixed(6);
+  const centerLng = (route.stops.reduce((sum, s) => sum + s.longitude, 0) / coords.length).toFixed(6);
+  const zoom = 13;
+
+  const markerParams = coords.map(c => `markers=label:P|${c}`).join("&");
+  const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${centerLat},${centerLng}&zoom=${zoom}&size=600x300&style=feature:road|element:geometry|lightness:50&${markerParams}&key=YOUR_STATIC_MAP_KEY`;
+
   return `
-    <div class="map-container">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h6 class="mb-0">Route Map</h6>
-        <div class="btn-group" role="group">
-          <button type="button" class="btn btn-sm btn-outline-primary" onclick="openInGoogleMaps('${mapUrl}')">
-            <i class="fas fa-external-link-alt"></i> Open in Maps
-          </button>
-          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="refreshMap('${mapId}')">
-            <i class="fas fa-refresh"></i> Refresh
-          </button>
-        </div>
-      </div>
-      
-      <div class="ratio ratio-16x9">
-        <iframe 
-          id="${mapId}"
-          src="${mapUrl}" 
-          width="100%" 
-          height="100%" 
-          style="border:0;" 
-          allowfullscreen
-          loading="lazy"
-          referrerpolicy="no-referrer-when-downgrade"
-          onerror="handleMapError('${mapId}')"
-          onload="handleMapLoad('${mapId}')">
-        </iframe>
-      </div>
-      
-      <div id="${mapId}-error" class="alert alert-warning mt-2" style="display: none;">
-        <i class="fas fa-exclamation-triangle"></i>
-        Unable to load embedded map. 
-        <a href="${mapUrl}" target="_blank" class="alert-link">Click here to open in Google Maps</a>
-      </div>
-    </div>
-  `;
+    <div class="map-container mb-3">
+      <img src="${mapUrl}" class="img-fluid rounded shadow-sm" alt="Route map ${idx+1}"/>
+    </div>`;
 }
 
-function handleMapError(mapId) {
-  console.error(`Map loading error for ${mapId}`);
-  document.getElementById(mapId).style.display = 'none';
-  document.getElementById(`${mapId}-error`).style.display = 'block';
+function copyParcelList(routeId) {
+  const card = document.querySelector(`[data-route-id="${routeId}"]`);
+  const parcels = Array.from(card.querySelectorAll("li")).map(li => {
+    const match = li.textContent.match(/P\d+/);
+    return match ? match[0] : "";
+  }).filter(Boolean).join("\n");
+
+  navigator.clipboard.writeText(parcels)
+    .then(() => alert("Parcel list copied to clipboard!"))
+    .catch(err => alert("Failed to copy parcel list."));
 }
-
-function handleMapLoad(mapId) {
-  console.log(`Map loaded successfully for ${mapId}`);
-  document.getElementById(`${mapId}-error`).style.display = 'none';
-}
-
-function refreshMap(mapId) {
-  const iframe = document.getElementById(mapId);
-  const currentSrc = iframe.src;
-  iframe.src = '';
-  setTimeout(() => {
-    iframe.src = currentSrc;
-  }, 100);
-}
-
-function openInGoogleMaps(mapUrl) {
-  // Convert embed URL to regular Google Maps URL if needed
-  let regularUrl = mapUrl;
-  
-  if (mapUrl.includes('maps/embed/v1/directions')) {
-    // Extract parameters and convert to regular maps URL
-    const urlParams = new URLSearchParams(mapUrl.split('?')[1]);
-    const origin = urlParams.get('origin');
-    const destination = urlParams.get('destination');
-    const waypoints = urlParams.get('waypoints');
-    
-    if (origin && destination) {
-      regularUrl = `https://www.google.com/maps/dir/${origin}`;
-      if (waypoints) {
-        regularUrl += `/${waypoints.replace(/\|/g, '/')}`;
-      }
-      regularUrl += `/${destination}`;
-    }
-  }
-  
-  window.open(regularUrl, '_blank');
-}
-
-// Add some CSS for better map styling
-const additionalCSS = `
-  <style>
-    .map-container {
-      border: 1px solid #dee2e6;
-      border-radius: 0.375rem;
-      padding: 1rem;
-      background-color: #f8f9fa;
-    }
-    
-    .map-container iframe {
-      border-radius: 0.375rem;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .btn-group .btn {
-      font-size: 0.875rem;
-    }
-    
-    .alert-warning a {
-      font-weight: 600;
-    }
-  </style>
-`;
-
-// Add the CSS to the head
-document.head.insertAdjacentHTML('beforeend', additionalCSS);
