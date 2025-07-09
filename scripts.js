@@ -31,16 +31,18 @@ document.addEventListener("DOMContentLoaded", () => {
           "Content-Type": "application/json"
         },
         body: JSON.stringify(payload)
-      })
-.then(response => response.json())
-.then(data => console.log(data))
-.catch(error => console.error("Fetch error:", error));
-;
+      });
+
+      if (!res.ok) {
+        throw new Error(`Server responded with status ${res.status}`);
+      }
 
       const data = await res.json();
+      console.log("Response from API:", data);
       renderResults(data);
+
     } catch (err) {
-      console.error(err);
+      console.error("Fetch error:", err);
       resultsDiv.innerHTML = `<div class="alert alert-danger">Something went wrong. Please try again.</div>`;
     }
   });
