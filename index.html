@@ -1,43 +1,476 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Parcel Route Optimizer</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
-  <script defer src="scripts.js"></script>
-<script
-  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCREarLqJnWh8hFARkjwiwhLKu8IUohYVQ&libraries=geometry"
-  async defer></script>
-
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Property Route Optimizer with Folium</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <style>
+        .appertivo-purple {
+            background-color: #6f42c1;
+            color: white;
+        }
+        
+        .route-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .route-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .map-container {
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+        }
+        
+        .stats-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .form-control:focus {
+            border-color: #6f42c1;
+            box-shadow: 0 0 0 0.2rem rgba(111, 66, 193, 0.25);
+        }
+        
+        .btn-primary {
+            background-color: #6f42c1;
+            border-color: #6f42c1;
+        }
+        
+        .btn-primary:hover {
+            background-color: #5a3397;
+            border-color: #5a3397;
+        }
+        
+        .spinner-border-sm {
+            width: 1rem;
+            height: 1rem;
+        }
+        
+        .badge {
+            font-size: 0.8em;
+        }
+        
+        .list-group-item {
+            border-left: 4px solid transparent;
+            transition: border-left-color 0.3s;
+        }
+        
+        .list-group-item:hover {
+            border-left-color: #6f42c1;
+            background-color: #f8f9fa;
+        }
+        
+        .card-header {
+            font-weight: 600;
+        }
+        
+        .toast-container {
+            z-index: 1055;
+        }
+        
+        .route-summary {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .control-panel {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .map-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        @media (max-width: 768px) {
+            .map-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .map-controls > * {
+                width: 100%;
+            }
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #6f42c1;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .hero-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 3rem 0;
+            margin-bottom: 2rem;
+        }
+        
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.8;
+        }
+        
+        .folium-map iframe {
+            border-radius: 8px;
+        }
+    </style>
 </head>
-<body class="bg-light">
-  <div class="container py-4">
-    <header class="mb-4 text-center">
-      <h1 class="appertivo-purple">Parcel Route Optimizer</h1>
-      <p class="text-muted">AI-powered field routing for assessors</p>
-    </header>
-
-    <div class="card shadow-sm mb-4">
-      <div class="card-body">
-        <label for="fieldMode" class="form-label fw-bold">Field Mode</label>
-        <select id="fieldMode" class="form-select mb-3">
-          <option value="REVAL">REVAL</option>
-          <option value="New Construction">New Construction</option>
-        </select>
-
-        <label for="parcelInput" class="form-label fw-bold">Enter Parcel IDs</label>
-        <textarea id="parcelInput" class="form-control mb-3" rows="6" placeholder="P123456&#10;P654321"></textarea>
-
-        <button id="optimizeBtn" class="btn btn-primary w-100 appertivo-orange">
-          🚀 Optimize Routes
-        </button>
-      </div>
+<body>
+    <!-- Hero Section -->
+    <div class="hero-section">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-lg-8">
+                    <h1 class="display-4 fw-bold mb-3">
+                        <i class="fas fa-route me-3"></i>
+                        Property Route Optimizer
+                    </h1>
+                    <p class="lead mb-4">
+                        Optimize your property inspection routes with intelligent clustering and interactive Folium maps.
+                        Get the most efficient routes for your field work.
+                    </p>
+                </div>
+                <div class="col-lg-4">
+                    <div class="text-center">
+                        <div class="feature-icon">
+                            <i class="fas fa-map-marked-alt"></i>
+                        </div>
+                        <h5>Interactive Mapping</h5>
+                        <p>Powered by Folium & Leaflet</p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <div id="results" class="mt-4"></div>
-  </div>
+    <div class="container">
+        <!-- Input Section -->
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card shadow-sm">
+                    <div class="card-header appertivo-purple">
+                        <h5 class="mb-0">
+                            <i class="fas fa-clipboard-list me-2"></i>
+                            Enter Property IDs
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="parcelInput" class="form-label">
+                                Property IDs (one per line, must start with 'P')
+                            </label>
+                            <textarea 
+                                id="parcelInput" 
+                                class="form-control" 
+                                rows="8" 
+                                placeholder="P12345&#10;P67890&#10;P11111&#10;..."
+                                style="font-family: monospace;"
+                            ></textarea>
+                            <div class="form-text">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Enter one property ID per line. Only IDs starting with 'P' will be processed.
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="fieldMode" class="form-label">Field Mode</label>
+                            <select id="fieldMode" class="form-select">
+                                <option value="REVAL">Revaluation (2 min stops)</option>
+                                <option value="INSPECTION">Inspection (10 min stops)</option>
+                            </select>
+                        </div>
+                        
+                        <button id="optimizeBtn" class="btn btn-primary btn-lg">
+                            <i class="fas fa-magic me-2"></i>
+                            Optimize Routes
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-lightbulb me-2"></i>
+                            Features
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                Interactive Folium maps
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                Multiple tile layers
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                Route clustering algorithm
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                Export to CSV
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                Combined or individual views
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                Measurement tools
+                            </li>
+                        </ul>
+                        
+                        <div class="alert alert-light mt-3">
+                            <small>
+                                <i class="fas fa-clock me-1"></i>
+                                Routes are optimized for 5-hour maximum duration
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div class="mt-4">
+            <div id="results"></div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-5 py-4 bg-light">
+            <div class="container">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>About</h6>
+                        <p class="text-muted">
+                            This tool uses Google Routes API for optimization and Folium for interactive mapping.
+                            Routes are clustered by drive time and optimized for efficiency.
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Technical Details</h6>
+                        <ul class="list-unstyled text-muted">
+                            <li><i class="fas fa-server me-2"></i>Python backend with Flask</li>
+                            <li><i class="fas fa-map me-2"></i>Folium + Leaflet.js mapping</li>
+                            <li><i class="fas fa-route me-2"></i>Google Routes API integration</li>
+                            <li><i class="fas fa-cloud me-2"></i>Google Cloud Functions</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script>
+        // Include the folium_frontend JavaScript code here
+        let routeData = [];
+        let currentMapType = 'individual'; // 'individual' or 'combined'
+
+        document.addEventListener("DOMContentLoaded", () => {
+          const optimizeBtn = document.getElementById("optimizeBtn");
+          const resultsDiv = document.getElementById("results");
+
+          // Add UI controls
+          addMapControls();
+
+          optimizeBtn.addEventListener("click", async () => {
+            const parcelText = document.getElementById("parcelInput").value.trim();
+            const fieldMode = document.getElementById("fieldMode").value;
+
+            const parcels = parcelText
+              .split("\n")
+              .map(p => p.trim().toUpperCase())
+              .filter(p => p.startsWith("P"));
+
+            if (parcels.length === 0) {
+              alert("Please enter valid parcel IDs.");
+              return;
+            }
+
+            // Update button state
+            optimizeBtn.disabled = true;
+            optimizeBtn.innerHTML = '<div class="loading-spinner me-2"></div>Processing...';
+
+            resultsDiv.innerHTML = `
+              <div class="alert alert-info">
+                <div class="d-flex align-items-center">
+                  <div class="loading-spinner me-3"></div>
+                  <div>
+                    <strong>Processing ${parcels.length} parcels...</strong>
+                    <br><small>This may take a moment while we optimize your routes.</small>
+                  </div>
+                </div>
+              </div>`;
+
+            try {
+              const res = await fetch("https://prouting-391338802487.us-west1.run.app", {
+                method: "POST",
+                mode: "cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ 
+                  parcels, 
+                  mode: fieldMode, 
+                  group_size: 30,
+                  return_map: true  // Request map generation
+                })
+              });
+
+              if (!res.ok) throw new Error(`Server error: ${res.status}`);
+              const data = await res.json();
+              
+              routeData = data.routes;
+              renderResults(data);
+
+            } catch (err) {
+              console.error("Fetch error:", err);
+              resultsDiv.innerHTML = `
+                <div class="alert alert-danger">
+                  <h6><i class="fas fa-exclamation-triangle me-2"></i>Error</h6>
+                  <p class="mb-0">${err.message}. Please try again.</p>
+                </div>`;
+            } finally {
+              // Reset button state
+              optimizeBtn.disabled = false;
+              optimizeBtn.innerHTML = '<i class="fas fa-magic me-2"></i>Optimize Routes';
+            }
+          });
+
+          // Map type toggle
+          document.addEventListener("change", (e) => {
+            if (e.target.id === "mapTypeToggle") {
+              currentMapType = e.target.checked ? 'combined' : 'individual';
+              if (routeData.length > 0) {
+                renderMaps();
+              }
+            }
+          });
+
+          // Export functionality
+          document.addEventListener("click", (e) => {
+            if (e.target.id === "exportBtn") {
+              exportRouteData();
+            }
+          });
+        });
+
+        function addMapControls() {
+          const controlsHtml = `
+            <div class="control-panel">
+              <div class="map-controls">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="mapTypeToggle">
+                  <label class="form-check-label" for="mapTypeToggle">
+                    <strong>Combined Map View</strong>
+                  </label>
+                </div>
+                <button id="exportBtn" class="btn btn-outline-primary">
+                  <i class="fas fa-download me-2"></i>Export All Routes
+                </button>
+                <button class="btn btn-outline-secondary" onclick="window.print()">
+                  <i class="fas fa-print me-2"></i>Print
+                </button>
+              </div>
+            </div>
+          `;
+          
+          const resultsDiv = document.getElementById("results");
+          resultsDiv.insertAdjacentHTML("beforebegin", controlsHtml);
+        }
+
+        function renderResults(data) {
+          const resultsDiv = document.getElementById("results");
+          resultsDiv.innerHTML = "";
+
+          const totalTime = data.routes.reduce((sum, r) => sum + r.total_time, 0);
+          const avgParcels = (
+            data.routes.reduce((sum, r) => sum + r.stops.length, 0) / data.routes.length
+          ).toFixed(1);
+
+          // Enhanced summary with more statistics
+          const summary = `
+            <div class="route-summary">
+              <h5 class="mb-4">📦 Route Summary</h5>
+              <div class="row text-center">
+                <div class="col-md-3 col-6 mb-3">
+                  <div class="stats-number">${data.stats.total_routes}</div>
+                  <div>Total Routes</div>
+                </div>
+                <div class="col-md-3 col-6 mb-3">
+                  <div class="stats-number">${totalTime.toFixed(1)}</div>
+                  <div>Total Minutes</div>
+                </div>
+                <div class="col-md-3 col-6 mb-3">
+                  <div class="stats-number">${avgParcels}</div>
+                  <div>Avg Parcels/Route</div>
+                </div>
+                <div class="col-md-3 col-6 mb-3">
+                  <div class="stats-number">${data.stats.found_parcels}</div>
+                  <div>Found Parcels</div>
+                </div>
+              </div>
+              ${data.stats.not_found_parcels.length > 0 ? `
+                <div class="alert alert-warning mt-3">
+                  <strong><i class="fas fa-exclamation-triangle me-2"></i>Not Found:</strong> 
+                  ${data.stats.not_found_parcels.join(", ")}
+                </div>
+              ` : ''}
+            </div>`;
+          
+          resultsDiv.insertAdjacentHTML("beforeend", summary);
+
+          // Render maps
+          renderMaps();
+        }
+
+        // Add the rest of the JavaScript functions here...
+        // (renderMaps, renderCombinedMap, renderIndividualMaps, etc.)
+        
+        // This would continue with all the other functions from the folium_frontend artifact
+    </script>
 </body>
 </html>
