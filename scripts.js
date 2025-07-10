@@ -4,8 +4,6 @@ let currentMapType = 'individual'; // 'individual' or 'combined'
 document.addEventListener("DOMContentLoaded", () => {
   const optimizeBtn = document.getElementById("optimizeBtn");
   const resultsDiv = document.getElementById("results");
-  const mapTypeToggle = document.getElementById("mapTypeToggle");
-  const exportBtn = document.getElementById("exportBtn");
 
   // Add UI controls
   addMapControls();
@@ -24,9 +22,11 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    optimizeBtn.disabled = true;
+    optimizeBtn.innerHTML = '<div class="loading-spinner me-2"></div>Processing...';
     resultsDiv.innerHTML = `
       <div class="alert alert-info">
-        <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+        <div class="loading-spinner me-3"></div>
         Processing ${parcels.length} parcels... please wait.
       </div>`;
 
@@ -38,8 +38,7 @@ document.addEventListener("DOMContentLoaded", () => {
         body: JSON.stringify({ 
           parcels, 
           mode: fieldMode, 
-          group_size: 30,
-          return_map: true  // Request map generation
+          return_map: true 
         })
       });
 
@@ -55,59 +54,51 @@ document.addEventListener("DOMContentLoaded", () => {
         <div class="alert alert-danger">
           <strong>Error:</strong> ${err.message}. Please try again.
         </div>`;
+    } finally {
+      optimizeBtn.disabled = false;
+      optimizeBtn.innerHTML = '<i class="fas fa-magic me-2"></i>Optimize Routes';
     }
   });
 
-  // Map type toggle
-  if (mapTypeToggle) {
-    mapTypeToggle.addEventListener("change", () => {
-      currentMapType = mapTypeToggle.checked ? 'combined' : 'individual';
+  document.addEventListener("change", (e) => {
+    if (e.target.id === "mapTypeToggle") {
+      currentMapType = e.target.checked ? 'combined' : 'individual';
       if (routeData.length > 0) {
         renderMaps();
       }
-    });
-  }
+    }
+  });
 
-  // Export functionality
-  if (exportBtn) {
-    exportBtn.addEventListener("click", () => {
+  document.addEventListener("click", (e) => {
+    if (e.target.id === "exportBtn") {
       exportRouteData();
-    });
-  }
+    }
+  });
 });
 
+// UI helpers
 function addMapControls() {
   const controlsHtml = `
-    <div class="card mb-3">
-      <div class="card-body">
-        <div class="row align-items-center">
-          <div class="col-md-4">
-            <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" id="mapTypeToggle">
-              <label class="form-check-label" for="mapTypeToggle">
-                <strong>Combined Map View</strong>
-              </label>
-            </div>
-          </div>
-          <div class="col-md-4">
-            <button id="exportBtn" class="btn btn-outline-primary btn-sm">
-              <i class="fas fa-download"></i> Export Routes
-            </button>
-          </div>
-          <div class="col-md-4">
-            <button id="printBtn" class="btn btn-outline-secondary btn-sm" onclick="window.print()">
-              <i class="fas fa-print"></i> Print
-            </button>
-          </div>
+    <div class="control-panel">
+      <div class="map-controls">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" id="mapTypeToggle">
+          <label class="form-check-label" for="mapTypeToggle">
+            <strong>Combined Map View</strong>
+          </label>
         </div>
+        <button id="exportBtn" class="btn btn-outline-primary">
+          <i class="fas fa-download me-2"></i>Export All Routes
+        </button>
+        <button class="btn btn-outline-secondary" onclick="window.print()">
+          <i class="fas fa-print me-2"></i>Print
+        </button>
       </div>
-    </div>
-  `;
-  
-  const resultsDiv = document.getElementById("results");
-  resultsDiv.insertAdjacentHTML("beforebegin", controlsHtml);
+    </div>`;
+  document.getElementById("results").insertAdjacentHTML("beforebegin", controlsHtml);
 }
 
+// Core display
 function renderResults(data) {
   const resultsDiv = document.getElementById("results");
   resultsDiv.innerHTML = "";
@@ -116,59 +107,42 @@ function renderResults(data) {
   const avgParcels = (
     data.routes.reduce((sum, r) => sum + r.stops.length, 0) / data.routes.length
   ).toFixed(1);
-  const totalDistance = data.routes.reduce((sum, r) => sum + (r.distance || 0), 0);
 
-  // Enhanced summary with more statistics
   const summary = `
-    <div class="card mb-4 shadow-sm">
-      <div class="card-body">
-        <h5 class="card-title">📦 Route Summary</h5>
-        <div class="row">
-          <div class="col-md-3">
-            <div class="text-center">
-              <h3 class="text-primary">${data.stats.total_routes}</h3>
-              <small>Total Routes</small>
-            </div>
-          </div>
-          <div class="col-md-3">
-            <div class="text-center">
-              <h3 class="text-success">${totalTime.toFixed(1)}</h3>
-              <small>Total Minutes</small>
-            </div>
-          </div>
-          <div class="col-md-3">
-            <div class="text-center">
-              <h3 class="text-info">${avgParcels}</h3>
-              <small>Avg Parcels/Route</small>
-            </div>
-          </div>
-          <div class="col-md-3">
-            <div class="text-center">
-              <h3 class="text-warning">${data.stats.found_parcels}</h3>
-              <small>Found Parcels</small>
-            </div>
-          </div>
+    <div class="route-summary">
+      <h5 class="mb-4">📦 Route Summary</h5>
+      <div class="row text-center">
+        <div class="col-md-3 col-6 mb-3">
+          <div class="stats-number">${data.stats.total_routes}</div>
+          <div>Total Routes</div>
         </div>
-        ${data.stats.not_found_parcels.length > 0 ? `
-          <div class="alert alert-warning mt-3">
-            <strong>Not Found:</strong> ${data.stats.not_found_parcels.join(", ")}
-          </div>
-        ` : ''}
+        <div class="col-md-3 col-6 mb-3">
+          <div class="stats-number">${totalTime.toFixed(1)}</div>
+          <div>Total Minutes</div>
+        </div>
+        <div class="col-md-3 col-6 mb-3">
+          <div class="stats-number">${avgParcels}</div>
+          <div>Avg Parcels/Route</div>
+        </div>
+        <div class="col-md-3 col-6 mb-3">
+          <div class="stats-number">${data.stats.found_parcels}</div>
+          <div>Found Parcels</div>
+        </div>
       </div>
+      ${data.stats.not_found_parcels.length > 0 ? `
+        <div class="alert alert-warning mt-3">
+          <strong>Not Found:</strong> ${data.stats.not_found_parcels.join(", ")}
+        </div>
+      ` : ''}
     </div>`;
-  
   resultsDiv.insertAdjacentHTML("beforeend", summary);
 
-  // Render maps
   renderMaps();
 }
 
 async function renderMaps() {
   const resultsDiv = document.getElementById("results");
-  
-  // Remove existing map containers
-  const existingMaps = resultsDiv.querySelectorAll('.map-container');
-  existingMaps.forEach(map => map.remove());
+  resultsDiv.querySelectorAll('.map-container').forEach(map => map.remove());
 
   if (currentMapType === 'combined') {
     await renderCombinedMap();
@@ -179,8 +153,7 @@ async function renderMaps() {
 
 async function renderCombinedMap() {
   const resultsDiv = document.getElementById("results");
-  
-  const mapContainer = `
+  resultsDiv.insertAdjacentHTML("beforeend", `
     <div class="map-container">
       <div class="card mb-4 shadow-sm">
         <div class="card-header bg-primary text-white">
@@ -191,9 +164,7 @@ async function renderCombinedMap() {
         </div>
       </div>
     </div>
-  `;
-  
-  resultsDiv.insertAdjacentHTML("beforeend", mapContainer);
+  `);
 
   try {
     const response = await fetch("https://prouting-391338802487.us-west1.run.app/generate_map", {
@@ -202,23 +173,13 @@ async function renderCombinedMap() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ routes: routeData })
     });
-
     if (!response.ok) throw new Error(`Map generation failed: ${response.status}`);
-    
     const mapHtml = await response.text();
     document.getElementById("combined-map").innerHTML = mapHtml;
-    
   } catch (error) {
-    console.error("Failed to generate combined map:", error);
     document.getElementById("combined-map").innerHTML = `
-      <div class="alert alert-danger m-3">
-        Failed to generate map: ${error.message}
-      </div>
-    `;
+      <div class="alert alert-danger m-3">Failed to generate map: ${error.message}</div>`;
   }
-
-  // Add route list below map
-  addRouteList();
 }
 
 async function renderIndividualMaps() {
@@ -226,226 +187,67 @@ async function renderIndividualMaps() {
 
   for (let i = 0; i < routeData.length; i++) {
     const route = routeData[i];
-    const mapDivId = `map-${i}`;
-
-    if (route.stops.length < 1) continue;
-
-    const stopsList = route.stops.map((stop, idx) =>
-      `<li class="list-group-item d-flex justify-content-between align-items-center">
-        <div>
-          <span class="badge bg-primary me-2">${idx + 1}</span>
-          <strong>${stop.prop_id}</strong>
-          <div class="text-muted small">${stop.address || "No address"}</div>
-        </div>
-        <div>
-          <a href="https://maps.google.com/?q=${stop.latitude},${stop.longitude}" 
-             target="_blank" class="btn btn-sm btn-outline-primary">
-            <i class="fas fa-external-link-alt"></i>
-          </a>
-        </div>
+    const mapId = `map-${i}`;
+    const stopsHtml = route.stops.map((s, j) => `
+      <li class="list-group-item">
+        <span class="badge bg-primary me-2">${j + 1}</span>
+        <strong>${s.prop_id}</strong> <small class="text-muted">${s.address || ""}</small>
       </li>`).join("");
 
-    const mapContainer = `
+    resultsDiv.insertAdjacentHTML("beforeend", `
       <div class="map-container">
-        <div class="card mb-3 shadow-sm" data-route-id="${mapDivId}">
-          <div class="card-header bg-light d-flex justify-content-between align-items-center">
-            <h6 class="mb-0">🚗 Route ${i + 1}</h6>
-            <div class="d-flex align-items-center gap-3">
-              <small class="text-muted">
-                <i class="fas fa-clock"></i> ${route.total_time.toFixed(1)} min
-              </small>
-              <small class="text-muted">
-                <i class="fas fa-map-marker-alt"></i> ${route.stops.length} stops
-              </small>
-            </div>
+        <div class="card mb-4 shadow-sm">
+          <div class="card-header bg-light">
+            <strong>Route ${i + 1}</strong> - ${route.total_time.toFixed(1)} min, ${route.stops.length} stops
           </div>
           <div class="card-body p-0">
-            <div id="${mapDivId}" style="height: 400px; width: 100%;"></div>
+            <div id="${mapId}" style="height: 400px;"></div>
           </div>
           <div class="card-footer">
-            <div class="row">
-              <div class="col-md-8">
-                <h6>Stops:</h6>
-                <ul class="list-group list-group-flush" style="max-height: 200px; overflow-y: auto;">
-                  ${stopsList}
-                </ul>
-              </div>
-              <div class="col-md-4 d-flex flex-column gap-2">
-                <button class="btn btn-sm btn-outline-success" onclick="copyParcelList('${mapDivId}')">
-                  <i class="fas fa-copy"></i> Copy Parcel List
-                </button>
-                <button class="btn btn-sm btn-outline-info" onclick="exportRoute(${i})">
-                  <i class="fas fa-download"></i> Export Route
-                </button>
-              </div>
-            </div>
+            <ul class="list-group">${stopsHtml}</ul>
           </div>
         </div>
       </div>
-    `;
-    
-    resultsDiv.insertAdjacentHTML("beforeend", mapContainer);
+    `);
 
-    // Generate individual map
     try {
-      const response = await fetch("https://prouting-391338802487.us-west1.run.app/generate_map", {
+      const res = await fetch("https://prouting-391338802487.us-west1.run.app/generate_map", {
         method: "POST",
         mode: "cors",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ routes: [route] })
       });
-
-      if (!response.ok) throw new Error(`Map generation failed: ${response.status}`);
-      
-      const mapHtml = await response.text();
-      document.getElementById(mapDivId).innerHTML = mapHtml;
-      
-    } catch (error) {
-      console.error(`Failed to generate map for route ${i + 1}:`, error);
-      document.getElementById(mapDivId).innerHTML = `
-        <div class="alert alert-warning m-3">
-          Failed to generate map: ${error.message}
-        </div>
-      `;
+      const html = await res.text();
+      document.getElementById(mapId).innerHTML = html;
+    } catch (err) {
+      document.getElementById(mapId).innerHTML = `<div class="alert alert-danger">Map failed</div>`;
     }
   }
 }
 
-function addRouteList() {
-  const resultsDiv = document.getElementById("results");
-  
-  const routeList = routeData.map((route, i) => {
-    const stopsList = route.stops.map((stop, idx) => 
-      `<span class="badge bg-light text-dark me-1">${idx + 1}. ${stop.prop_id}</span>`
-    ).join("");
-    
-    return `
-      <div class="card mb-2">
-        <div class="card-body">
-          <h6>Route ${i + 1} <small class="text-muted">(${route.total_time.toFixed(1)} min)</small></h6>
-          <div class="mb-2">${stopsList}</div>
-          <button class="btn btn-sm btn-outline-primary" onclick="copyParcelList('route-${i}')">
-            <i class="fas fa-copy"></i> Copy
-          </button>
-        </div>
-      </div>
-    `;
-  }).join("");
-  
-  const routeListContainer = `
-    <div class="card mb-4">
-      <div class="card-header">
-        <h5 class="mb-0">📋 Route Details</h5>
-      </div>
-      <div class="card-body">
-        ${routeList}
-      </div>
-    </div>
-  `;
-  
-  resultsDiv.insertAdjacentHTML("beforeend", routeListContainer);
-}
-
-// Utility functions
-window.copyParcelList = function(routeId) {
-  const routeIndex = parseInt(routeId.split('-')[1]);
-  const route = routeData[routeIndex];
-  
-  if (!route) return;
-  
-  const parcelList = route.stops.map(stop => stop.prop_id).join('\n');
-  
-  navigator.clipboard.writeText(parcelList).then(() => {
-    // Show success toast
-    showToast('Parcel list copied to clipboard!', 'success');
-  }).catch(err => {
-    console.error('Failed to copy:', err);
-    showToast('Failed to copy parcel list', 'error');
-  });
-};
-
-window.exportRoute = function(routeIndex) {
-  const route = routeData[routeIndex];
-  if (!route) return;
-  
-  const csvContent = [
-    ['Stop', 'Property ID', 'Address', 'Latitude', 'Longitude', 'Neighborhood'],
-    ...route.stops.map((stop, idx) => [
-      idx + 1,
-      stop.prop_id,
-      stop.address || '',
-      stop.latitude,
-      stop.longitude,
-      stop.hood || ''
-    ])
-  ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
-  
-  downloadCSV(csvContent, `route_${routeIndex + 1}.csv`);
-};
-
 function exportRouteData() {
-  const allRoutes = routeData.flatMap((route, routeIndex) => 
-    route.stops.map((stop, stopIndex) => ({
-      route: routeIndex + 1,
-      stop: stopIndex + 1,
-      property_id: stop.prop_id,
-      address: stop.address || '',
+  const allRoutes = routeData.flatMap((route, i) =>
+    route.stops.map((stop, j) => ({
+      route: i + 1,
+      stop: j + 1,
+      prop_id: stop.prop_id,
+      address: stop.address || "",
       latitude: stop.latitude,
       longitude: stop.longitude,
-      neighborhood: stop.hood || '',
-      route_time_minutes: route.total_time
+      hood: stop.hood || "",
+      total_time: route.total_time
     }))
   );
-  
-  const csvContent = [
+  const csv = [
     Object.keys(allRoutes[0]),
     ...allRoutes.map(row => Object.values(row))
   ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
-  
-  downloadCSV(csvContent, 'all_routes.csv');
-}
 
-function downloadCSV(content, filename) {
-  const blob = new Blob([content], { type: 'text/csv' });
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
   a.href = url;
-  a.download = filename;
+  a.download = "all_routes.csv";
   a.click();
-  window.URL.revokeObjectURL(url);
-}
-
-function showToast(message, type = 'info') {
-  // Create toast element
-  const toast = document.createElement('div');
-  toast.className = `toast align-items-center text-white bg-${type === 'success' ? 'success' : 'danger'} border-0`;
-  toast.setAttribute('role', 'alert');
-  toast.innerHTML = `
-    <div class="d-flex">
-      <div class="toast-body">${message}</div>
-      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-    </div>
-  `;
-  
-  // Add to page
-  const toastContainer = document.getElementById('toast-container') || createToastContainer();
-  toastContainer.appendChild(toast);
-  
-  // Show toast
-  const bsToast = new bootstrap.Toast(toast);
-  bsToast.show();
-  
-  // Remove after hiding
-  toast.addEventListener('hidden.bs.toast', () => {
-    toast.remove();
-  });
-}
-
-function createToastContainer() {
-  const container = document.createElement('div');
-  container.id = 'toast-container';
-  container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
-  container.style.zIndex = '1055';
-  document.body.appendChild(container);
-  return container;
+  URL.revokeObjectURL(url);
 }
