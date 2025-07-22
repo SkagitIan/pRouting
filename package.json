@@ -1,0 +1,45 @@
+{
+  "name": "prouting",
+  "version": "1.0.0",
+  "main": "scripts.js",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:verbose": "jest --verbose",
+    "test:unit": "jest tests/utils.test.js",
+    "test:dom": "jest tests/dom.test.js",
+    "test:api": "jest tests/api.test.js",
+    "test:performance": "jest tests/performance.test.js",
+    "test:e2e": "jest tests/e2e.test.js",
+    "test:ci": "jest --coverage --watchAll=false"
+  },
+  "keywords": [
+    "routing",
+    "property",
+    "optimization",
+    "mapping"
+  ],
+  "author": "",
+  "license": "ISC",
+  "description": "Property Route Optimizer web application with interactive mapping",
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "jest": "^30.0.5",
+    "jest-environment-jsdom": "^30.0.5",
+    "jsdom": "^26.1.0"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/setup.js"
+    ],
+    "collectCoverageFrom": [
+      "scripts-testable.js",
+      "!node_modules/**"
+    ],
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ]
+  }
+}
