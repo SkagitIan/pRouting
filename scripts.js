@@ -31,7 +31,11 @@ document.addEventListener("DOMContentLoaded", () => {
       </div>`;
 
     try {
-      const res = await fetch("https://prouting-391338802487.us-west1.run.app", {
+      // Backend API endpoint - switch between local development and production
+      const API_BASE_URL = "http://localhost:5000"; // For local development
+      // const API_BASE_URL = "https://prouting-391338802487.us-west1.run.app"; // For production
+      
+      const res = await fetch(API_BASE_URL, {
         method: "POST",
         mode: "cors",
         headers: { "Content-Type": "application/json" },
