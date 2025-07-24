@@ -181,29 +181,31 @@ def route_handler(request):
             if filtered.empty:
                 return (jsonify({'error': 'No parcels found'}), 404, headers)
 
-            # Project to Web Mercator for geometry work
             projected = filtered.to_crs(epsg=3857)
 
             parcels = []
             for _, row in projected.iterrows():
                 parcel_id = row['Parcel Number']
-                parcel_geom = row['geometry']
-
+                parcel_geom = row['geometry']  # projected geometry for snapping
+            
                 try:
-                    # Use road-facing smart snapping
                     node = snap_parcel_to_road_node(G_DRIVE, parcel_geom)
                     node_data = G_DRIVE.nodes[node]
                     lat, lon = node_data['y'], node_data['x']
-
+            
+                    # Get original WGS84 geometry from the unprojected 'filtered' dataframe
+                    original_geom = filtered.loc[filtered['Parcel Number'] == parcel_id, 'geometry'].values[0]
+            
                     parcels.append({
                         'parcel_id': parcel_id,
                         'lat': lat,
                         'lon': lon,
-                        'geometry': parcel_geom.to_crs(epsg=4326).__geo_interface__  # return in WGS84
+                        'geometry': original_geom.__geo_interface__  # ✅ Already EPSG:4326
                     })
-
+            
                 except Exception as e:
                     print(f"[SNAP FAIL] Parcel {parcel_id} skipped: {e}")
+
 
             if not parcels:
                 return (jsonify({'error': 'All parcels failed to snap'}), 500, headers)
