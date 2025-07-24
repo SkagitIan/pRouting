@@ -11,6 +11,8 @@ from typing import List
 import tempfile
 import gzip
 import shutil
+from shapely.geometry import LineString
+import shapely.ops as ops
 
 # Constants
 PARQUET_URL = "https://storage.googleapis.com/skagitgeojson/merged_parcels.parquet"
@@ -72,12 +74,51 @@ def load_parquet_data():
         print(f"Error loading parcel data: {e}")
         return None
 
+
+
+def snap_parcel_to_road_node(graph, parcel_geom):
+    parcel_boundary = parcel_geom.exterior
+    rep_point = parcel_geom.representative_point()
+
+    u, v, key = ox.distance.nearest_edges(graph, X=rep_point.x, Y=rep_point.y)
+    u_coords = (graph.nodes[u]['x'], graph.nodes[u]['y'])
+    v_coords = (graph.nodes[v]['x'], graph.nodes[v]['y'])
+    edge_line = LineString([u_coords, v_coords])
+
+    # Nearest point on parcel to edge
+    nearest = nearest_points(parcel_boundary, edge_line)[0]
+
+    # Snap that point to nearest node in graph
+    node = ox.distance.nearest_nodes(graph, X=nearest.x, Y=nearest.y)
+    return node
+
+
+
 def snap_to_graph(graph, lat, lon):
+    """
+    Snap a point to the nearest edge in the graph and return a node ID for routing.
+    This avoids multiple points collapsing to the same node when they fall near the same intersection.
+    """
     try:
-        return ox.nearest_nodes(graph, X=lon, Y=lat)
+        # Snap to nearest edge (returns u, v, key)
+        u, v, key = ox.distance.nearest_edges(graph, X=lon, Y=lat)
+        edge_data = graph[u][v][key]
+
+        # Choose the closer node (u or v) to the input point
+        u_point = graph.nodes[u]
+        v_point = graph.nodes[v]
+
+        dist_to_u = ((u_point['x'] - lon)**2 + (u_point['y'] - lat)**2)**0.5
+        dist_to_v = ((v_point['x'] - lon)**2 + (v_point['y'] - lat)**2)**0.5
+
+        nearest_node = u if dist_to_u < dist_to_v else v
+
+        print(f"[EDGE SNAP] ({lat:.5f}, {lon:.5f}) → edge ({u}, {v}) → node {nearest_node}")
+        return nearest_node
+
     except Exception as e:
-        print(f"Nearest node error (likely missing sklearn): {e}")
-        raise RuntimeError("Missing sklearn. Please install it or project the graph.")
+        print(f"[SNAP ERROR] ({lat}, {lon}) → {e}")
+        raise
 
 
 def build_time_matrix(graph, node_ids):
@@ -136,25 +177,39 @@ def route_handler(request):
                 return (jsonify({'error': 'Failed to load parcel data'}), 500, headers)
 
             filtered = gdf[gdf['Parcel Number'].isin(parcel_ids)].copy()
-            filtered = filtered.drop_duplicates(subset=['Parcel Number']) 
+            filtered = filtered.drop_duplicates(subset=['Parcel Number'])
             if filtered.empty:
                 return (jsonify({'error': 'No parcels found'}), 404, headers)
 
+            # Project to Web Mercator for geometry work
             projected = filtered.to_crs(epsg=3857)
-            centroids = projected.geometry.centroid.to_crs(epsg=4326)
-            filtered['centroid_lat'] = centroids.y
-            filtered['centroid_lon'] = centroids.x
 
             parcels = []
-            for _, row in filtered.iterrows():
-                parcels.append({
-                    'parcel_id': row['Parcel Number'],
-                    'lat': row['centroid_lat'],
-                    'lon': row['centroid_lon'],
-                    'geometry': row['geometry'].__geo_interface__
-                })
+            for _, row in projected.iterrows():
+                parcel_id = row['Parcel Number']
+                parcel_geom = row['geometry']
+
+                try:
+                    # Use road-facing smart snapping
+                    node = snap_parcel_to_road_node(G_DRIVE, parcel_geom)
+                    node_data = G_DRIVE.nodes[node]
+                    lat, lon = node_data['y'], node_data['x']
+
+                    parcels.append({
+                        'parcel_id': parcel_id,
+                        'lat': lat,
+                        'lon': lon,
+                        'geometry': parcel_geom.to_crs(epsg=4326).__geo_interface__  # return in WGS84
+                    })
+
+                except Exception as e:
+                    print(f"[SNAP FAIL] Parcel {parcel_id} skipped: {e}")
+
+            if not parcels:
+                return (jsonify({'error': 'All parcels failed to snap'}), 500, headers)
 
             return (jsonify({'success': True, 'parcels': parcels, 'count': len(parcels)}), 200, headers)
+
 
         elif action == "optimize_route":
             mode = data.get('mode', 'drive')
@@ -184,7 +239,7 @@ def route_handler(request):
 
             try:
                 for lat, lon in coords:
-                    node = snap_to_graph(graph, lat, lon)
+                    node = snap_parcel_to_road_node(graph, row['geometry'])
                     node_ids.append(node)
             except Exception as e:
                 print(f"[SNAP ERROR] {e}")
