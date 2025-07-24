@@ -1,253 +1,127 @@
-let routeData = [];
-let currentMapType = 'individual'; // 'individual' or 'combined'
+  const BACKEND_URL = "https://prouting-391338802487.us-west1.run.app"; // ← CHANGE THIS
 
-document.addEventListener("DOMContentLoaded", () => {
-  const optimizeBtn = document.getElementById("optimizeBtn");
-  const resultsDiv = document.getElementById("results");
+  let parcelData = [];
+  let routeCounter = 1;
+  let drawnItems = new L.FeatureGroup();
+  const routeState = {};
 
-  // Add UI controls
-  addMapControls();
+  const map = L.map('main-map').setView([48.5, -122.3], 10);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18,
+  }).addTo(map);
+  map.addLayer(drawnItems);
 
-  optimizeBtn.addEventListener("click", async () => {
-    const parcelText = document.getElementById("parcelInput").value.trim();
-    const fieldMode = document.getElementById("fieldMode").value;
-
-    const parcels = parcelText
-      .split("\n")
-      .map(p => p.trim().toUpperCase())
-      .filter(p => p.startsWith("P"));
-
-    if (parcels.length === 0) {
-      alert("Please enter valid parcel IDs.");
-      return;
-    }
-
-    optimizeBtn.disabled = true;
-    optimizeBtn.innerHTML = '<div class="loading-spinner me-2"></div>Processing...';
-    resultsDiv.innerHTML = `
-      <div class="alert alert-info">
-        <div class="loading-spinner me-3"></div>
-        Processing ${parcels.length} parcels... please wait.
-      </div>`;
-
-    try {
-      const res = await fetch("https://prouting-391338802487.us-west1.run.app", {
-        method: "POST",
-        mode: "cors",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          parcels, 
-          mode: fieldMode, 
-          return_map: true 
-        })
-      });
-
-      if (!res.ok) throw new Error(`Server error: ${res.status}`);
-      const data = await res.json();
-      
-      routeData = data.routes;
-      renderResults(data);
-
-    } catch (err) {
-      console.error("Fetch error:", err);
-      resultsDiv.innerHTML = `
-        <div class="alert alert-danger">
-          <strong>Error:</strong> ${err.message}. Please try again.
-        </div>`;
-    } finally {
-      optimizeBtn.disabled = false;
-      optimizeBtn.innerHTML = '<i class="fas fa-magic me-2"></i>Optimize Routes';
+  const drawControl = new L.Control.Draw({
+    edit: { featureGroup: drawnItems },
+    draw: {
+      polygon: true,
+      rectangle: true,
+      circle: false,
+      polyline: false,
+      marker: false
     }
   });
+  map.addControl(drawControl);
 
-  document.addEventListener("change", (e) => {
-    if (e.target.id === "mapTypeToggle") {
-      currentMapType = e.target.checked ? 'combined' : 'individual';
-      if (routeData.length > 0) {
-        renderMaps();
+  map.on(L.Draw.Event.CREATED, function (event) {
+    const layer = event.layer;
+    drawnItems.addLayer(layer);
+    const selected = parcelData.filter(p => layer.getBounds().contains([p.lat, p.lon]));
+    if (selected.length > 0) createRouteCard(selected);
+  });
+
+  function loadParcels() {
+    const raw = document.getElementById('parcel-input').value.trim().split(/\s+/);
+    fetch(BACKEND_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'get_parcels',
+        parcel_ids: raw
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (!data.success) {
+        alert("Failed to load parcels.");
+        return;
       }
-    }
-  });
-
-  document.addEventListener("click", (e) => {
-    if (e.target.id === "exportBtn") {
-      exportRouteData();
-    }
-  });
-});
-
-// UI helpers
-function addMapControls() {
-  const controlsHtml = `
-    <div class="control-panel">
-      <div class="map-controls">
-        <div class="form-check form-switch">
-          <input class="form-check-input" type="checkbox" id="mapTypeToggle">
-          <label class="form-check-label" for="mapTypeToggle">
-            <strong>Combined Map View</strong>
-          </label>
-        </div>
-        <button id="exportBtn" class="btn btn-outline-primary">
-          <i class="fas fa-download me-2"></i>Export All Routes
-        </button>
-        <button class="btn btn-outline-secondary" onclick="window.print()">
-          <i class="fas fa-print me-2"></i>Print
-        </button>
-      </div>
-    </div>`;
-  document.getElementById("results").insertAdjacentHTML("beforebegin", controlsHtml);
-}
-
-// Core display
-function renderResults(data) {
-  const resultsDiv = document.getElementById("results");
-  resultsDiv.innerHTML = "";
-
-  const totalTime = data.routes.reduce((sum, r) => sum + r.total_time, 0);
-  const avgParcels = (
-    data.routes.reduce((sum, r) => sum + r.stops.length, 0) / data.routes.length
-  ).toFixed(1);
-
-  const summary = `
-    <div class="route-summary">
-      <h5 class="mb-4">📦 Route Summary</h5>
-      <div class="row text-center">
-        <div class="col-md-3 col-6 mb-3">
-          <div class="stats-number">${data.stats.total_routes}</div>
-          <div>Total Routes</div>
-        </div>
-        <div class="col-md-3 col-6 mb-3">
-          <div class="stats-number">${totalTime.toFixed(1)}</div>
-          <div>Total Minutes</div>
-        </div>
-        <div class="col-md-3 col-6 mb-3">
-          <div class="stats-number">${avgParcels}</div>
-          <div>Avg Parcels/Route</div>
-        </div>
-        <div class="col-md-3 col-6 mb-3">
-          <div class="stats-number">${data.stats.found_parcels}</div>
-          <div>Found Parcels</div>
-        </div>
-      </div>
-      ${data.stats.not_found_parcels.length > 0 ? `
-        <div class="alert alert-warning mt-3">
-          <strong>Not Found:</strong> ${data.stats.not_found_parcels.join(", ")}
-        </div>
-      ` : ''}
-    </div>`;
-  resultsDiv.insertAdjacentHTML("beforeend", summary);
-
-  renderMaps();
-}
-
-async function renderMaps() {
-  const resultsDiv = document.getElementById("results");
-  resultsDiv.querySelectorAll('.map-container').forEach(map => map.remove());
-
-  if (currentMapType === 'combined') {
-    await renderCombinedMap();
-  } else {
-    await renderIndividualMaps();
-  }
-}
-
-async function renderCombinedMap() {
-  const resultsDiv = document.getElementById("results");
-  resultsDiv.insertAdjacentHTML("beforeend", `
-    <div class="map-container">
-      <div class="card mb-4 shadow-sm">
-        <div class="card-header bg-primary text-white">
-          <h5 class="mb-0">🗺️ Combined Route Map</h5>
-        </div>
-        <div class="card-body p-0">
-          <div id="combined-map" style="height: 600px; width: 100%;"></div>
-        </div>
-      </div>
-    </div>
-  `);
-
-  try {
-    const response = await fetch("https://prouting-391338802487.us-west1.run.app/generate_map", {
-      method: "POST",
-      mode: "cors",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ routes: routeData })
-    });
-    if (!response.ok) throw new Error(`Map generation failed: ${response.status}`);
-    const mapHtml = await response.text();
-    document.getElementById("combined-map").innerHTML = mapHtml;
-  } catch (error) {
-    document.getElementById("combined-map").innerHTML = `
-      <div class="alert alert-danger m-3">Failed to generate map: ${error.message}</div>`;
-  }
-}
-
-async function renderIndividualMaps() {
-  const resultsDiv = document.getElementById("results");
-
-  for (let i = 0; i < routeData.length; i++) {
-    const route = routeData[i];
-    const mapId = `map-${i}`;
-    const stopsHtml = route.stops.map((s, j) => `
-      <li class="list-group-item">
-        <span class="badge bg-primary me-2">${j + 1}</span>
-        <strong>${s.prop_id}</strong> <small class="text-muted">${s.address || ""}</small>
-      </li>`).join("");
-
-    resultsDiv.insertAdjacentHTML("beforeend", `
-      <div class="map-container">
-        <div class="card mb-4 shadow-sm">
-          <div class="card-header bg-light">
-            <strong>Route ${i + 1}</strong> - ${route.total_time.toFixed(1)} min, ${route.stops.length} stops
-          </div>
-          <div class="card-body p-0">
-            <div id="${mapId}" style="height: 400px;"></div>
-          </div>
-          <div class="card-footer">
-            <ul class="list-group">${stopsHtml}</ul>
-          </div>
-        </div>
-      </div>
-    `);
-
-    try {
-      const res = await fetch("https://prouting-391338802487.us-west1.run.app/generate_map", {
-        method: "POST",
-        mode: "cors",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ routes: [route] })
+      parcelData = data.parcels;
+      parcelData.forEach(p => {
+        const marker = L.circleMarker([p.lat, p.lon], { radius: 4, color: 'blue' }).addTo(map);
+        marker.bindTooltip(p.parcel_id);
       });
-      const html = await res.text();
-      document.getElementById(mapId).innerHTML = html;
-    } catch (err) {
-      document.getElementById(mapId).innerHTML = `<div class="alert alert-danger">Map failed</div>`;
-    }
+      const bounds = L.latLngBounds(parcelData.map(p => [p.lat, p.lon]));
+      map.fitBounds(bounds);
+    });
   }
-}
 
-function exportRouteData() {
-  const allRoutes = routeData.flatMap((route, i) =>
-    route.stops.map((stop, j) => ({
-      route: i + 1,
-      stop: j + 1,
-      prop_id: stop.prop_id,
-      address: stop.address || "",
-      latitude: stop.latitude,
-      longitude: stop.longitude,
-      hood: stop.hood || "",
-      total_time: route.total_time
-    }))
-  );
-  const csv = [
-    Object.keys(allRoutes[0]),
-    ...allRoutes.map(row => Object.values(row))
-  ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+  function createRouteCard(parcels) {
+    const routeId = `route-${routeCounter++}`;
+    routeState[routeId] = { parcels, optimized: false, mode: 'drive' };
 
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "all_routes.csv";
-  a.click();
-  URL.revokeObjectURL(url);
-}
+    const html = `
+      <div class="card mb-3" id="${routeId}">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <strong>${routeId}</strong>
+          <select class="form-select form-select-sm w-auto" onchange="changeMode('${routeId}', this.value)">
+            <option value="drive">🚗 Drive</option>
+            <option value="walk">🚶 Walk</option>
+          </select>
+        </div>
+        <div class="card-body">
+          <div id="${routeId}-map" class="map-container"></div>
+          <ul class="list-group parcel-list" id="list-${routeId}">
+            ${parcels.map(p => `<li class="list-group-item" data-id="${p.parcel_id}">${p.parcel_id}</li>`).join('')}
+          </ul>
+          <button class="btn btn-sm btn-primary mt-2" onclick="optimizeRoute('${routeId}')">Optimize</button>
+        </div>
+      </div>
+    `;
+    document.getElementById('routes').insertAdjacentHTML('beforeend', html);
+
+    const routeMap = L.map(`${routeId}-map`, {
+      attributionControl: false,
+      zoomControl: false
+    }).setView([parcels[0].lat, parcels[0].lon], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(routeMap);
+    parcels.forEach(p => L.circleMarker([p.lat, p.lon], { radius: 4, color: 'green' }).addTo(routeMap));
+
+    Sortable.create(document.getElementById(`list-${routeId}`), {
+      group: 'routes',
+      animation: 150,
+      onAdd: () => routeState[routeId].optimized = false,
+      onUpdate: () => routeState[routeId].optimized = false
+    });
+  }
+
+  function changeMode(routeId, mode) {
+    routeState[routeId].mode = mode;
+    routeState[routeId].optimized = false;
+  }
+
+  function optimizeRoute(routeId) {
+    const ul = document.getElementById(`list-${routeId}`);
+    const parcel_ids = Array.from(ul.querySelectorAll('li')).map(li => li.dataset.id);
+    const mode = routeState[routeId].mode;
+
+    fetch(BACKEND_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'optimize_route',
+        parcel_ids,
+        mode
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status !== 'success') {
+        alert("Optimization failed.");
+        return;
+      }
+      routeState[routeId].optimized = true;
+      alert(`Route ${routeId} optimized!\nTotal time: ${data.total_time} min`);
+      // TODO: Render polyline if returned
+    });
+  }
