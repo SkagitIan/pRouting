@@ -13,6 +13,7 @@ import gzip
 import shutil
 from shapely.geometry import LineString
 import shapely.ops as ops
+from shapely.ops import nearest_points
 
 # Constants
 PARQUET_URL = "https://storage.googleapis.com/skagitgeojson/merged_parcels.parquet"
