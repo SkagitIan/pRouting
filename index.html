@@ -1,311 +1,169 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Property Route Optimizer with Folium</title>
-    <script defer src="scripts.js"></script>
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    
-    <!-- Custom CSS -->
-    <style>
-        .appertivo-purple {
-            background-color: #6f42c1;
-            color: white;
-        }
-        
-        .route-card {
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        
-        .route-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }
-        
-        .map-container {
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        
-        .stats-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 15px;
-        }
-        
-        .stats-number {
-            font-size: 2.5rem;
-            font-weight: 700;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
-        
-        .form-control:focus {
-            border-color: #6f42c1;
-            box-shadow: 0 0 0 0.2rem rgba(111, 66, 193, 0.25);
-        }
-        
-        .btn-primary {
-            background-color: #6f42c1;
-            border-color: #6f42c1;
-        }
-        
-        .btn-primary:hover {
-            background-color: #5a3397;
-            border-color: #5a3397;
-        }
-        
-        .spinner-border-sm {
-            width: 1rem;
-            height: 1rem;
-        }
-        
-        .badge {
-            font-size: 0.8em;
-        }
-        
-        .list-group-item {
-            border-left: 4px solid transparent;
-            transition: border-left-color 0.3s;
-        }
-        
-        .list-group-item:hover {
-            border-left-color: #6f42c1;
-            background-color: #f8f9fa;
-        }
-        
-        .card-header {
-            font-weight: 600;
-        }
-        
-        .toast-container {
-            z-index: 1055;
-        }
-        
-        .route-summary {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            color: white;
-            border-radius: 15px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-        }
-        
-        .control-panel {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 1rem;
-            margin-bottom: 2rem;
-        }
-        
-        .map-controls {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        
-        @media (max-width: 768px) {
-            .map-controls {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            
-            .map-controls > * {
-                width: 100%;
-            }
-        }
-        
-        .loading-spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #6f42c1;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .hero-section {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 3rem 0;
-            margin-bottom: 2rem;
-        }
-        
-        .feature-icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            opacity: 0.8;
-        }
-        
-        .folium-map iframe {
-            border-radius: 8px;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Parcel Route Editor</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+  <style>
+    #main-map, .map-container {
+      height: 400px;
+      width: 100%;
+      margin-bottom: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 0.5rem;
+    }
+    .sortable li {
+      cursor: grab;
+    }
+  </style>
 </head>
-<body>
-    <!-- Hero Section -->
-    <div class="hero-section">
-        <div class="container">
-            <div class="row align-items-center">
-                <div class="col-lg-8">
-                    <h1 class="display-4 fw-bold mb-3">
-                        <i class="fas fa-route me-3"></i>
-                        Property Route Optimizer
-                    </h1>
-                    <p class="lead mb-4">
-                        Optimize your property inspection routes with intelligent clustering and interactive Folium maps.
-                        Get the most efficient routes for your field work.
-                    </p>
-                </div>
-                <div class="col-lg-4">
-                    <div class="text-center">
-                        <div class="feature-icon">
-                            <i class="fas fa-map-marked-alt"></i>
-                        </div>
-                        <h5>Interactive Mapping</h5>
-                        <p>Powered by Folium & Leaflet</p>
-                    </div>
-                </div>
-            </div>
+<body class="p-4">
+  <div class="container">
+    <h1 class="mb-4">Parcel Route Editor</h1>
+
+    <textarea id="parcel-input" class="form-control mb-3" rows="3" placeholder="Paste parcel IDs..."></textarea>
+    <button class="btn btn-primary mb-4" onclick="loadParcels()">Load Parcels</button>
+
+    <div id="main-map"></div>
+
+    <div id="routes" class="mt-4"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script>
+  const BACKEND_URL = "https://prouting-391338802487.us-west1.run.app"; // ← CHANGE THIS
+
+  let parcelData = [];
+  let routeCounter = 1;
+  let drawnItems = new L.FeatureGroup();
+  const routeState = {};
+
+  const map = L.map('main-map').setView([48.5, -122.3], 10);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18,
+  }).addTo(map);
+  map.addLayer(drawnItems);
+
+  const drawControl = new L.Control.Draw({
+    edit: { featureGroup: drawnItems },
+    draw: {
+      polygon: true,
+      rectangle: true,
+      circle: false,
+      polyline: false,
+      marker: false
+    }
+  });
+  map.addControl(drawControl);
+
+  map.on(L.Draw.Event.CREATED, function (event) {
+    const layer = event.layer;
+    drawnItems.addLayer(layer);
+    const selected = parcelData.filter(p => layer.getBounds().contains([p.lat, p.lon]));
+    if (selected.length > 0) createRouteCard(selected);
+  });
+
+  function loadParcels() {
+    const raw = document.getElementById('parcel-input').value.trim().split(/\s+/);
+    fetch(BACKEND_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'get_parcels',
+        parcel_ids: raw
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (!data.success) {
+        alert("Failed to load parcels.");
+        return;
+      }
+      parcelData = data.parcels;
+      parcelData.forEach(p => {
+        const marker = L.circleMarker([p.lat, p.lon], { radius: 4, color: 'blue' }).addTo(map);
+        marker.bindTooltip(p.parcel_id);
+      });
+      const bounds = L.latLngBounds(parcelData.map(p => [p.lat, p.lon]));
+      map.fitBounds(bounds);
+    });
+  }
+
+  function createRouteCard(parcels) {
+    const routeId = `route-${routeCounter++}`;
+    routeState[routeId] = { parcels, optimized: false, mode: 'drive' };
+
+    const html = `
+      <div class="card mb-3" id="${routeId}">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <strong>${routeId}</strong>
+          <select class="form-select form-select-sm w-auto" onchange="changeMode('${routeId}', this.value)">
+            <option value="drive">🚗 Drive</option>
+            <option value="walk">🚶 Walk</option>
+          </select>
         </div>
-    </div>
-
-    <div class="container">
-        <!-- Input Section -->
-        <div class="row">
-            <div class="col-lg-8">
-                <div class="card shadow-sm">
-                    <div class="card-header appertivo-purple">
-                        <h5 class="mb-0">
-                            <i class="fas fa-clipboard-list me-2"></i>
-                            Enter Property IDs
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label for="parcelInput" class="form-label">
-                                Property IDs (one per line, must start with 'P')
-                            </label>
-                            <textarea 
-                                id="parcelInput" 
-                                class="form-control" 
-                                rows="8" 
-                                placeholder="P12345&#10;P67890&#10;P11111&#10;..."
-                                style="font-family: monospace;"
-                            ></textarea>
-                            <div class="form-text">
-                                <i class="fas fa-info-circle me-1"></i>
-                                Enter one property ID per line. Only IDs starting with 'P' will be processed.
-                            </div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="fieldMode" class="form-label">Field Mode</label>
-                            <select id="fieldMode" class="form-select">
-                                <option value="REVAL">Revaluation (2 min stops)</option>
-                                <option value="INSPECTION">Inspection (10 min stops)</option>
-                            </select>
-                        </div>
-                        
-                        <button id="optimizeBtn" class="btn btn-primary btn-lg">
-                            <i class="fas fa-magic me-2"></i>
-                            Optimize Routes
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-lg-4">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-info text-white">
-                        <h5 class="mb-0">
-                            <i class="fas fa-lightbulb me-2"></i>
-                            Features
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <ul class="list-unstyled">
-                            <li class="mb-2">
-                                <i class="fas fa-check-circle text-success me-2"></i>
-                                Interactive Folium maps
-                            </li>
-                            <li class="mb-2">
-                                <i class="fas fa-check-circle text-success me-2"></i>
-                                Multiple tile layers
-                            </li>
-                            <li class="mb-2">
-                                <i class="fas fa-check-circle text-success me-2"></i>
-                                Route clustering algorithm
-                            </li>
-                            <li class="mb-2">
-                                <i class="fas fa-check-circle text-success me-2"></i>
-                                Export to CSV
-                            </li>
-                            <li class="mb-2">
-                                <i class="fas fa-check-circle text-success me-2"></i>
-                                Combined or individual views
-                            </li>
-                            <li class="mb-2">
-                                <i class="fas fa-check-circle text-success me-2"></i>
-                                Measurement tools
-                            </li>
-                        </ul>
-                        
-                        <div class="alert alert-light mt-3">
-                            <small>
-                                <i class="fas fa-clock me-1"></i>
-                                Routes are optimized for 5-hour maximum duration
-                            </small>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <div class="card-body">
+          <div id="${routeId}-map" class="map-container"></div>
+          <ul class="list-group parcel-list" id="list-${routeId}">
+            ${parcels.map(p => `<li class="list-group-item" data-id="${p.parcel_id}">${p.parcel_id}</li>`).join('')}
+          </ul>
+          <button class="btn btn-sm btn-primary mt-2" onclick="optimizeRoute('${routeId}')">Optimize</button>
         </div>
+      </div>
+    `;
+    document.getElementById('routes').insertAdjacentHTML('beforeend', html);
 
-        <!-- Results Section -->
-        <div class="mt-4">
-            <div id="results"></div>
-        </div>
+    const routeMap = L.map(`${routeId}-map`, {
+      attributionControl: false,
+      zoomControl: false
+    }).setView([parcels[0].lat, parcels[0].lon], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(routeMap);
+    parcels.forEach(p => L.circleMarker([p.lat, p.lon], { radius: 4, color: 'green' }).addTo(routeMap));
 
-        <!-- Footer -->
-        <footer class="mt-5 py-4 bg-light">
-            <div class="container">
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6>About</h6>
-                        <p class="text-muted">
-                            This tool uses Google Routes API for optimization and Folium for interactive mapping.
-                            Routes are clustered by drive time and optimized for efficiency.
-                        </p>
-                    </div>
-                    <div class="col-md-6">
-                        <h6>Technical Details</h6>
-                        <ul class="list-unstyled text-muted">
-                            <li><i class="fas fa-server me-2"></i>Python backend with Flask</li>
-                            <li><i class="fas fa-map me-2"></i>Folium + Leaflet.js mapping</li>
-                            <li><i class="fas fa-route me-2"></i>Google Routes API integration</li>
-                            <li><i class="fas fa-cloud me-2"></i>Google Cloud Functions</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </footer>
-    </div>
-<!-- Bootstrap JS -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    Sortable.create(document.getElementById(`list-${routeId}`), {
+      group: 'routes',
+      animation: 150,
+      onAdd: () => routeState[routeId].optimized = false,
+      onUpdate: () => routeState[routeId].optimized = false
+    });
+  }
 
-<!-- Include consolidated JS -->
-<script defer src="scripts.js"></script>
+  function changeMode(routeId, mode) {
+    routeState[routeId].mode = mode;
+    routeState[routeId].optimized = false;
+  }
+
+  function optimizeRoute(routeId) {
+    const ul = document.getElementById(`list-${routeId}`);
+    const parcel_ids = Array.from(ul.querySelectorAll('li')).map(li => li.dataset.id);
+    const mode = routeState[routeId].mode;
+
+    fetch(BACKEND_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'optimize_route',
+        parcel_ids,
+        mode
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status !== 'success') {
+        alert("Optimization failed.");
+        return;
+      }
+      routeState[routeId].optimized = true;
+      alert(`Route ${routeId} optimized!\nTotal time: ${data.total_time} min`);
+      // TODO: Render polyline if returned
+    });
+  }
+</script>
 
 </body>
 </html>
